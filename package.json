@@ -1,0 +1,15 @@
+{
+  "name": "of-chatter-ext",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "bun build.js",
+    "build:watch": "bun build.js --watch",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OF Chatter — Mock Test Harness</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #1f2937;
+      color: #f9fafb;
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header .badge {
+      background: #6366f1;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+    }
+    .layout {
+      display: flex;
+      flex: 1;
+      gap: 0;
+      height: calc(100vh - 50px);
+    }
+
+    /* ── LEFT: Chat simulation ─────────────────────────────── */
+    .chat-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .chat-pane-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      background: #f9fafb;
+    }
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    /* data-testid="chat-messages" matches the selector in dom-observer.ts */
+    .message {
+      max-width: 72%;
+      padding: 8px 12px;
+      border-radius: 14px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .message.from-creator {
+      align-self: flex-end;
+      background: #6366f1;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    /* from-fan class + data-from-fan attr match extractMessageFromNode() */
+    .message.from-fan {
+      align-self: flex-start;
+      background: #f3f4f6;
+      color: #111827;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-input-area {
+      border-top: 1px solid #e5e7eb;
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+    }
+    /* data-testid="chat-input" matches findAnchorElement() primary selector */
+    #chat-input-box {
+      flex: 1;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+      resize: none;
+      height: 40px;
+    }
+    #chat-input-box:focus { border-color: #6366f1; }
+    #send-btn {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0 16px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    #send-btn:hover { background: #4f46e5; }
+
+    /* ── RIGHT: Config + AI panel ──────────────────────────── */
+    .right-pane {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+    }
+    .config-section {
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+    }
+    .config-section h3 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .field {
+      margin-bottom: 10px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #374151;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    .field input {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    .field input:focus { border-color: #6366f1; }
+    #key-status {
+      font-size: 11px;
+      margin-top: 4px;
+      color: #9ca3af;
+    }
+    #key-status.saved { color: #16a34a; }
+    .sim-section {
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .sim-section h3 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    #simulate-btn {
+      width: 100%;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    #simulate-btn:hover { background: #059669; }
+    #fan-msg-preview {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+    .ai-section {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .ai-section h3 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    #ai-panel-container {
+      min-height: 80px;
+    }
+    .console-section {
+      border-top: 1px solid #e5e7eb;
+      padding: 12px 16px;
+      background: #1f2937;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    #console-log {
+      font-family: monospace;
+      font-size: 11px;
+      color: #9ca3af;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    #console-log .log-info { color: #93c5fd; }
+    #console-log .log-warn { color: #fbbf24; }
+    #console-log .log-error { color: #f87171; }
+  </style>
+</head>
+<body>
+
+<header>
+  OF Chatter Assistant
+  <span class="badge">Mock Harness</span>
+</header>
+
+<div class="layout">
+
+  <!-- ── LEFT: Simulated chat ─────────────────────────────── -->
+  <div class="chat-pane">
+    <div class="chat-pane-header">
+      💬 Chat with BigFan99 (mock)
+    </div>
+
+    <!--
+      data-testid="chat-messages" — matches findChatContainer() primary selector.
+      The injector will observe this container for new fan messages.
+    -->
+    <div id="chat-messages" data-testid="chat-messages">
+      <div class="message from-creator">Hey, thanks for subscribing! 💕</div>
+      <div class="message from-fan" data-from-fan="true">Hey! Love your content, so happy I found you!</div>
+      <div class="message from-creator">Aww that makes my day 🥰 What type of content do you enjoy most?</div>
+      <div class="message from-fan" data-from-fan="true">Honestly the gym stuff and anything behind the scenes</div>
+      <div class="message from-creator">Omg yes! I just filmed something super spicy from today's workout 👀</div>
+      <div class="message from-fan" data-from-fan="true">Oh wow, I would love to see that!</div>
+    </div>
+
+    <div class="chat-input-area">
+      <!--
+        data-testid="chat-input" — matches findAnchorElement() primary selector.
+        The suggestion panel will be injected after this element.
+      -->
+      <textarea
+        id="chat-input-box"
+        data-testid="chat-input"
+        placeholder="Type a message…"
+        rows="1"
+      ></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Config + AI suggestions ──────────────────── -->
+  <div class="right-pane">
+
+    <div class="config-section">
+      <h3>Configuration</h3>
+      <div class="field">
+        <label for="api-key-input">Anthropic API Key</label>
+        <input
+          type="password"
+          id="api-key-input"
+          placeholder="sk-ant-…"
+          autocomplete="off"
+        />
+        <div id="key-status">Not set</div>
+      </div>
+    </div>
+
+    <div class="sim-section">
+      <h3>Simulate Fan Message</h3>
+      <button id="simulate-btn">▶ Send Fan Message</button>
+      <div id="fan-msg-preview"></div>
+    </div>
+
+    <div class="ai-section">
+      <h3>AI Suggestion Panel</h3>
+      <div id="ai-panel-container">
+        <p style="color:#9ca3af;font-size:12px;">
+          Enter your API key and click "Send Fan Message" to see AI suggestions appear here.
+        </p>
+      </div>
+    </div>
+
+    <div class="console-section">
+      <div id="console-log">[OFC Mock] Console ready…
+</div>
+    </div>
+
+  </div>
+</div>
+
+<!--
+  CRITICAL: The chrome mock MUST be defined BEFORE the content script is loaded.
+  The content script calls chrome.runtime.sendMessage, chrome.storage, etc.
+  at module evaluation time (for the SPA nav observer) — so the mock must exist first.
+-->
+<script>
+  // ── Console capture ───────────────────────────────────────
+  const logEl = document.getElementById('console-log');
+  function appendLog(level, args) {
+    const line = document.createElement('span');
+    line.className = 'log-' + level;
+    line.textContent = '[' + level.toUpperCase() + '] ' + args.map(String).join(' ') + '\n';
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  const _origLog = console.log.bind(console);
+  const _origWarn = console.warn.bind(console);
+  const _origError = console.error.bind(console);
+  console.log = (...a) => { _origLog(...a); appendLog('info', a); };
+  console.warn = (...a) => { _origWarn(...a); appendLog('warn', a); };
+  console.error = (...a) => { _origError(...a); appendLog('error', a); };
+
+  // ── Mock chrome namespace ─────────────────────────────────
+  // Backed by localStorage (sync) and in-memory object (local)
+  const _localStore = {};
+
+  window.chrome = {
+    runtime: {
+      onMessage: { addListener: () => {} },
+      onInstalled: { addListener: () => {} },
+      sendMessage: async (request) => {
+        // Intercept GET_SUGGESTIONS — call Anthropic API directly
+        if (request.type === 'GET_SUGGESTIONS') {
+          const apiKey = localStorage.getItem('MOCK_API_KEY');
+          if (!apiKey) {
+            return { success: false, error: 'API key not set. Enter it in the config panel.' };
+          }
+
+          // Build prompt inline (mirrors prompt-builder logic)
+          const history = request.conversation.slice(-10);
+          const historyText = history.map(m =>
+            '[' + (m.role === 'fan' ? 'Fan' : 'You') + ']: ' + m.text
+          ).join('\n');
+
+          const fp = request.fanProfile;
+          const cp = request.creatorPersona;
+
+          const systemPrompt = `You are an expert OnlyFans chatter managing conversations on behalf of a creator.
+Your goal is to maximize fan engagement and revenue while maintaining an authentic,
+warm tone that matches the creator's persona.
+
+Creator persona: ${cp.name} — ${cp.description}
+Fan profile: Name: ${fp.displayName} | Total spent: $${fp.lifetimeValue.toFixed(2)}
+
+Generate exactly 3 reply options as JSON:
+[
+  { "type": "engage", "text": "..." },
+  { "type": "soft_upsell", "text": "..." },
+  { "type": "direct_upsell", "text": "..." }
+]
+
+Respond ONLY with the JSON array. No preamble, no explanation, no markdown fences.`;
+
+          const userPrompt = `Conversation history:\n${historyText}\n\nGenerate 3 reply suggestions now.`;
+
+          try {
+            console.log('[OFC Mock] Calling Anthropic API…');
+            const resp = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                // Required for direct browser-side API calls (bypasses CORS restriction)
+                'anthropic-dangerous-direct-browser-access': 'true',
+              },
+              body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 1024,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userPrompt }],
+              }),
+            });
+
+            if (!resp.ok) {
+              const errText = await resp.text();
+              return { success: false, error: `API error ${resp.status}: ${errText}` };
+            }
+
+            const data = await resp.json();
+            const rawText = data.content?.[0]?.text ?? '';
+            console.log('[OFC Mock] Raw API response:', rawText.slice(0, 100));
+
+            // Strip markdown fences if present
+            const cleaned = rawText
+              .replace(/^```(?:json)?\s*/i, '')
+              .replace(/\s*```$/, '')
+              .trim();
+
+            let suggestions;
+            try {
+              suggestions = JSON.parse(cleaned);
+            } catch {
+              suggestions = [{ type: 'engage', text: rawText.slice(0, 300) }];
+            }
+
+            return { success: true, suggestions };
+          } catch (err) {
+            return { success: false, error: String(err) };
+          }
+        }
+        return { success: false, error: 'Unknown request type' };
+      },
+    },
+
+    storage: {
+      sync: {
+        get: (keys) => {
+          const result = {};
+          const keyArr = Array.isArray(keys) ? keys : (typeof keys === 'string' ? [keys] : Object.keys(keys));
+          for (const k of keyArr) {
+            const val = localStorage.getItem('MOCK_SYNC_' + k);
+            if (val !== null) result[k] = k === 'MAX_SUGGESTIONS' ? Number(val) : val;
+          }
+          return Promise.resolve(result);
+        },
+        set: (obj) => {
+          for (const [k, v] of Object.entries(obj)) {
+            localStorage.setItem('MOCK_SYNC_' + k, String(v));
+          }
+          return Promise.resolve();
+        },
+      },
+      local: {
+        get: (keys) => {
+          if (keys === null || keys === undefined) {
+            return Promise.resolve({ ..._localStore });
+          }
+          const result = {};
+          const keyArr = Array.isArray(keys) ? keys : (typeof keys === 'string' ? [keys] : Object.keys(keys));
+          for (const k of keyArr) {
+            if (k in _localStore) result[k] = _localStore[k];
+          }
+          return Promise.resolve(result);
+        },
+        set: (obj) => {
+          Object.assign(_localStore, obj);
+          return Promise.resolve();
+        },
+        remove: (keys) => {
+          const keyArr = Array.isArray(keys) ? keys : [keys];
+          for (const k of keyArr) delete _localStore[k];
+          return Promise.resolve();
+        },
+      },
+    },
+
+    scripting: {},
+  };
+
+  // ── Mock flag — lets injector.ts skip the URL check ───────
+  // Must be set BEFORE injector.js loads (replaceState may throw on file://)
+  window.__OFC_MOCK__ = true;
+  window.__OFC_MOCK_FAN_ID__ = '1234567';
+
+  // ── API key persistence ───────────────────────────────────
+  // Set this up BEFORE replaceState so a throw can't kill the listener.
+  const keyInput = document.getElementById('api-key-input');
+  const keyStatus = document.getElementById('key-status');
+
+  const savedKey = localStorage.getItem('MOCK_API_KEY');
+  if (savedKey) {
+    keyInput.value = savedKey;
+    keyStatus.textContent = 'Key saved ✓';
+    keyStatus.classList.add('saved');
+    localStorage.setItem('MOCK_SYNC_ANTHROPIC_API_KEY', savedKey);
+  }
+
+  function onKeyChange() {
+    const val = keyInput.value.trim();
+    if (val) {
+      localStorage.setItem('MOCK_API_KEY', val);
+      localStorage.setItem('MOCK_SYNC_ANTHROPIC_API_KEY', val);
+      keyStatus.textContent = 'Key saved ✓';
+      keyStatus.classList.add('saved');
+    } else {
+      localStorage.removeItem('MOCK_API_KEY');
+      localStorage.removeItem('MOCK_SYNC_ANTHROPIC_API_KEY');
+      keyStatus.textContent = 'Not set';
+      keyStatus.classList.remove('saved');
+    }
+  }
+  // Listen on both input (typing) and change (paste / autofill)
+  keyInput.addEventListener('input', onKeyChange);
+  keyInput.addEventListener('change', onKeyChange);
+
+  // ── Set fake URL so extractFanIdFromUrl() works ────────────
+  // Wrapped in try-catch: Chrome may throw SecurityError on file:// → non-file path.
+  // The __OFC_MOCK__ flag above is the primary gate; this is best-effort.
+  try {
+    history.replaceState({}, '', '/my/chats/1234567');
+  } catch (e) {
+    console.warn('[OFC Mock] replaceState blocked (file:// origin) — using window flag instead.');
+  }
+
+  // ── Fan message simulation ────────────────────────────────
+  const fanMessages = [
+    'hey are you there? 😊',
+    'do you do custom content?',
+    'what would a private video cost?',
+    'just renewed my sub, you\'re amazing 🔥',
+    'can we chat sometime?',
+    'I loved your last post!',
+    'do you have any exclusive deals for loyal fans?',
+  ];
+  let msgIndex = 0;
+
+  const previewEl = document.getElementById('fan-msg-preview');
+  const chatMessages = document.getElementById('chat-messages');
+
+  function simulateFanMessage() {
+    const text = fanMessages[msgIndex % fanMessages.length];
+    msgIndex++;
+
+    // Update preview
+    previewEl.textContent = `Next: "${fanMessages[msgIndex % fanMessages.length]}"`;
+
+    // Append to chat — from-fan class + data-from-fan="true" triggers the observer
+    const div = document.createElement('div');
+    div.className = 'message from-fan';
+    div.setAttribute('data-from-fan', 'true');
+    div.textContent = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  document.getElementById('simulate-btn').addEventListener('click', simulateFanMessage);
+
+  // Show first preview
+  previewEl.textContent = `Next: "${fanMessages[0]}"`;
+
+  // ── Send button (creator side) ────────────────────────────
+  document.getElementById('send-btn').addEventListener('click', () => {
+    const box = document.getElementById('chat-input-box');
+    const text = box.value.trim();
+    if (!text) return;
+    const div = document.createElement('div');
+    div.className = 'message from-creator';
+    div.textContent = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    box.value = '';
+  });
+</script>
+
+<!--
+  Content script loaded AFTER the chrome mock is fully defined above.
+  The injector will find [data-testid="chat-input"] as its anchor
+  and inject the suggestion panel after it.
+-->
+<script src="../dist/content/injector.js"></script>
+
+</body>
+</html>
