@@ -4,8 +4,6 @@ import type {
   CreatorPersona,
 } from '../types/index';
 
-const MAX_HISTORY_MESSAGES = 10;
-
 interface PromptInput {
   conversation: ConversationMessage[];
   fanProfile: FanProfile;
@@ -20,10 +18,7 @@ interface BuiltPrompt {
 export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
   const { conversation, fanProfile, creatorPersona } = input;
 
-  // Take only the last N messages to keep token usage low
-  const recentHistory = conversation.slice(-MAX_HISTORY_MESSAGES);
-
-  const historyText = recentHistory
+  const historyText = conversation
     .map((m) => `[${m.role === 'fan' ? 'Fan' : 'You'}]: ${m.text}`)
     .join('\n');
 
@@ -45,7 +40,7 @@ Generate exactly 3 reply options as JSON:
 
 Respond ONLY with the JSON array. No preamble, no explanation, no markdown fences.`;
 
-  const user = `Conversation history (last ${recentHistory.length} messages):
+  const user = `Conversation history (${conversation.length} messages):
 ${historyText}
 
 Generate 3 reply suggestions now.`;

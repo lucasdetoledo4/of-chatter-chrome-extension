@@ -98,9 +98,7 @@ export function observeChat(
  * "message" in the class names of message bubbles even across class hash changes.
  * Role is inferred from the `from-fan` signals; everything else is creator.
  */
-export function scrapeConversationHistory(
-  limit = 20
-): ConversationMessage[] {
+export function scrapeConversationHistory(): ConversationMessage[] {
   const container = findChatContainer();
   if (!container) return [];
 
@@ -108,10 +106,7 @@ export function scrapeConversationHistory(
   // is a substring present in all OF message bubble class names.
   const nodes = Array.from(container.querySelectorAll('[class*="message"]'));
 
-  // Take last `limit` nodes (most recent messages)
-  const recentNodes = nodes.slice(-limit);
-
-  return recentNodes.reduce<ConversationMessage[]>((acc, node) => {
+  return nodes.reduce<ConversationMessage[]>((acc, node) => {
     const isFan =
       node.getAttribute('data-from-fan') === 'true' ||
       node.classList.contains('from-fan');

@@ -115,7 +115,7 @@ async function handleNewMessage(
   }
 
   // Build conversation context (scraped history + new message appended)
-  const history = scrapeConversationHistory(20);
+  const history = scrapeConversationHistory();
   // Avoid duplicating the triggering message if it was already scraped
   const lastScraped = history[history.length - 1];
   const conversation: ConversationMessage[] =

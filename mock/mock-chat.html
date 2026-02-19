@@ -345,7 +345,7 @@
           }
 
           // Build prompt inline (mirrors prompt-builder logic)
-          const history = request.conversation.slice(-10);
+          const history = request.conversation;
           const historyText = history.map(m =>
             '[' + (m.role === 'fan' ? 'Fan' : 'You') + ']: ' + m.text
           ).join('\n');
