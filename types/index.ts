@@ -55,6 +55,18 @@ export interface CreatorPersona {
   type: CreatorType;
 }
 
+// ─── Creator Profile ──────────────────────────────────────────────────────────
+
+export interface CreatorProfile {
+  creatorId: string;          // 'self' — one creator per install for now
+  displayName: string;
+  bio: string;
+  profilePhotoUrl?: string;
+  recentCaptions: string[];
+  writingStyle?: string;      // AI-generated style summary, cached after first run
+  scrapedAt: string;          // ISO 8601
+}
+
 // ─── Background Messaging ─────────────────────────────────────────────────────
 
 export interface GetSuggestionsRequest {
@@ -64,13 +76,21 @@ export interface GetSuggestionsRequest {
   creatorPersona: CreatorPersona;
   /** Injected on regenerate to push the model toward a different style */
   variationHint?: string;
+  creatorProfile?: CreatorProfile;
+  /** Creator's own sent messages extracted from conversation history */
+  creatorRealMessages?: string[];
+}
+
+export interface AnalyzeCreatorStyleRequest {
+  type: 'ANALYZE_CREATOR_STYLE';
+  creatorMessages: string[];
 }
 
 // Discriminated union — add more message types here as the extension grows
-export type BackgroundRequest = GetSuggestionsRequest;
+export type BackgroundRequest = GetSuggestionsRequest | AnalyzeCreatorStyleRequest;
 
 export type BackgroundResponse =
-  | { success: true; suggestions: Suggestion[] }
+  | { success: true; suggestions: Suggestion[]; writingStyle?: string }
   | { success: false; error: string };
 
 // ─── Anthropic API ────────────────────────────────────────────────────────────
@@ -112,4 +132,5 @@ export interface SyncStorageSchema {
   ANTHROPIC_API_KEY?: string;
   DEFAULT_MODEL?: string;
   MAX_SUGGESTIONS?: number;
+  CREATOR_TYPE?: string;
 }

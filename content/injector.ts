@@ -2,13 +2,17 @@ import type {
   ConversationMessage,
   FanProfile,
   CreatorPersona,
+  CreatorProfile,
   BackgroundResponse,
   GetSuggestionsRequest,
+  AnalyzeCreatorStyleRequest,
+  CreatorType,
 } from '../types/index';
 import { observeChat, scrapeConversationHistory, findChatContainer } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
-import { upsertFanProfile, getFanProfile } from '../utils/storage';
+import { upsertFanProfile, getFanProfile, getCreatorProfile, upsertCreatorProfile } from '../utils/storage';
 import { CREATOR_PRESETS, pickVariationHint } from '../utils/prompt-builder';
+import { scrapeCreatorProfile } from './profile-scraper';
 
 console.log('[OFC] Content script loaded.');
 
@@ -28,13 +32,53 @@ const w = window as typeof window & {
   __OFC_MOCK_ANCHOR_ID__?: string;
 };
 
-// Default persona — reads mock flag if set, otherwise falls back to 'woman' preset
+// Cached creator type — loaded from chrome.storage.sync on init
+let cachedCreatorType: CreatorType = 'woman';
+
+// Cached creator profile — loaded from chrome.storage.local on init
+let cachedCreatorProfile: CreatorProfile | null = null;
+
+// Default persona — uses cached creator type set by popup
 function getActivePersona(): CreatorPersona {
   const mockType = (window as typeof window & { __OFC_MOCK_PERSONA__?: string }).__OFC_MOCK_PERSONA__;
   if (mockType && mockType in CREATOR_PRESETS) {
     return CREATOR_PRESETS[mockType as keyof typeof CREATOR_PRESETS];
   }
-  return CREATOR_PRESETS.woman;
+  return { ...CREATOR_PRESETS[cachedCreatorType], name: cachedCreatorProfile?.displayName || CREATOR_PRESETS[cachedCreatorType].name };
+}
+
+async function loadCreatorState(): Promise<void> {
+  // Load creator type from sync storage (set by popup)
+  const syncResult = await chrome.storage.sync.get('CREATOR_TYPE');
+  const savedType = syncResult.CREATOR_TYPE as CreatorType | undefined;
+  if (savedType && savedType in CREATOR_PRESETS) {
+    cachedCreatorType = savedType;
+  }
+
+  // Load creator profile from local storage
+  cachedCreatorProfile = await getCreatorProfile('self');
+}
+
+/** Fire-and-forget style analysis when we have enough real messages. */
+function triggerStyleAnalysisIfNeeded(creatorRealMessages: string[]): void {
+  if (creatorRealMessages.length < 5 || cachedCreatorProfile?.writingStyle) return;
+
+  const req: AnalyzeCreatorStyleRequest = {
+    type: 'ANALYZE_CREATOR_STYLE',
+    creatorMessages: creatorRealMessages,
+  };
+  console.log('[OFC] Style analysis triggered — analysing creator voice…');
+
+  chrome.runtime.sendMessage<AnalyzeCreatorStyleRequest, BackgroundResponse>(req)
+    .then(async (resp) => {
+      if (resp.success && resp.writingStyle) {
+        cachedCreatorProfile = await upsertCreatorProfile('self', { writingStyle: resp.writingStyle });
+        console.log('[OFC] Style analysis complete — creator voice cached');
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn('[OFC] Style analysis failed:', err);
+    });
 }
 
 // ─── URL Helpers ──────────────────────────────────────────────────────────────
@@ -206,11 +250,22 @@ async function handleNewMessage(
   const conversation: ConversationMessage[] =
     lastScraped?.text === msg.text ? history : [...history, msg];
 
+  // Extract creator's own sent messages for persona grounding
+  const creatorRealMessages = conversation
+    .filter((m) => m.role === 'creator')
+    .map((m) => m.text)
+    .slice(-10);
+
+  // Kick off style analysis in background if we have enough messages
+  triggerStyleAnalysisIfNeeded(creatorRealMessages);
+
   const req: GetSuggestionsRequest = {
     type: 'GET_SUGGESTIONS',
     conversation,
     fanProfile,
     creatorPersona: getActivePersona(),
+    creatorProfile: cachedCreatorProfile ?? undefined,
+    creatorRealMessages,
   };
 
   // Expose the request so regenerate can replay it
@@ -233,11 +288,27 @@ async function fireSuggestionsRequest(
 
 // ─── Initialization ───────────────────────────────────────────────────────────
 
+// Module-level refs so we can tear down the previous instance on SPA re-navigation.
+// Without these, navigating away and back creates duplicate panels and stale observers.
+let _activeHostGuard: MutationObserver | null = null;
+let _activeStopObserver: (() => void) | null = null;
+
 async function initializeChatAssistant(): Promise<void> {
+  // Tear down previous instance before starting fresh.
+  // The UIOverlay.inject() also removes any stale DOM host, so together these
+  // two guards eliminate the "two panels on SPA re-navigation" bug.
+  _activeHostGuard?.disconnect();
+  _activeHostGuard = null;
+  _activeStopObserver?.();
+  _activeStopObserver = null;
+
   const fanId = extractFanIdFromUrl(location.pathname);
   if (!fanId) return;
 
   console.log(`[OFC] Chat assistant initializing for fan: ${fanId}`);
+
+  // Load creator type (popup setting) and cached creator profile
+  await loadCreatorState();
 
   const overlay = new UIOverlay();
   overlay.setInsertHandler(insertIntoChat);
@@ -252,8 +323,6 @@ async function initializeChatAssistant(): Promise<void> {
       );
     }
   });
-
-  let stopObserver: (() => void) | null = null;
 
   // Retry injection — OF Vue app may not have rendered the anchor yet
   let attempts = 0;
@@ -278,7 +347,8 @@ async function initializeChatAssistant(): Promise<void> {
   // rendered by Vue asynchronously and may not exist when the overlay first attaches.
   let observerAttempts = 0;
   const startObserver = (): void => {
-    stopObserver?.();
+    _activeStopObserver?.();
+    _activeStopObserver = null;
     if (!findChatContainer()) {
       if (observerAttempts < INJECT_RETRY_LIMIT) {
         observerAttempts++;
@@ -289,7 +359,7 @@ async function initializeChatAssistant(): Promise<void> {
       return;
     }
     observerAttempts = 0;
-    stopObserver = observeChat((msg) => {
+    _activeStopObserver = observeChat((msg) => {
       void handleNewMessage(msg, fanId, overlay, (req) => { lastRequest = req; });
     });
   };
@@ -306,6 +376,7 @@ async function initializeChatAssistant(): Promise<void> {
     }
   });
   hostGuard.observe(document.body, { childList: true, subtree: true });
+  _activeHostGuard = hostGuard;
 }
 
 // ─── SPA Navigation ───────────────────────────────────────────────────────────
@@ -323,6 +394,20 @@ const navObserver = new MutationObserver(() => {
     if (isOnChatPage()) {
       console.log('[OFC] SPA navigation to chat page — re-initializing.');
       void initializeChatAssistant();
+    } else {
+      // Opportunistically scrape creator profile data on profile pages
+      const scraped = scrapeCreatorProfile();
+      if (scraped) {
+        void upsertCreatorProfile('self', {
+          displayName: scraped.displayName,
+          bio: scraped.bio,
+          profilePhotoUrl: scraped.profilePhotoUrl,
+          recentCaptions: scraped.recentCaptions,
+          scrapedAt: new Date().toISOString(),
+        }).then((profile) => {
+          cachedCreatorProfile = profile;
+        });
+      }
     }
   }, SPA_NAV_DEBOUNCE_MS);
 });

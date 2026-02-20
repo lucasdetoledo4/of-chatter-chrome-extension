@@ -1,4 +1,4 @@
-import type { FanProfile, FanProfileUpdate } from '../types/index';
+import type { FanProfile, FanProfileUpdate, CreatorProfile } from '../types/index';
 
 const FAN_KEY_PREFIX = 'fan:';
 // Prune profiles not seen in this many days
@@ -50,6 +50,44 @@ export async function getAllFanProfiles(): Promise<FanProfile[]> {
 export async function deleteFanProfile(fanId: string): Promise<void> {
   await chrome.storage.local.remove(fanKey(fanId));
 }
+
+// ─── Creator Profile ──────────────────────────────────────────────────────────
+
+const CREATOR_KEY_PREFIX = 'creator:';
+
+function creatorKey(creatorId: string): string {
+  return `${CREATOR_KEY_PREFIX}${creatorId}`;
+}
+
+export async function getCreatorProfile(creatorId: string): Promise<CreatorProfile | null> {
+  const key = creatorKey(creatorId);
+  const result = await chrome.storage.local.get(key);
+  return (result[key] as CreatorProfile) ?? null;
+}
+
+export async function upsertCreatorProfile(
+  creatorId: string,
+  update: Partial<Omit<CreatorProfile, 'creatorId'>>
+): Promise<CreatorProfile> {
+  const existing = await getCreatorProfile(creatorId);
+  const now = new Date().toISOString();
+
+  const profile: CreatorProfile = existing
+    ? { ...existing, ...update, creatorId }
+    : {
+        creatorId,
+        displayName: update.displayName ?? '',
+        bio: update.bio ?? '',
+        recentCaptions: update.recentCaptions ?? [],
+        scrapedAt: now,
+        ...update,
+      };
+
+  await chrome.storage.local.set({ [creatorKey(creatorId)]: profile });
+  return profile;
+}
+
+// ─── Fan Profile ──────────────────────────────────────────────────────────────
 
 /**
  * Remove fan profiles that haven't been seen in PRUNE_AFTER_DAYS.
