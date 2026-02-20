@@ -52,6 +52,54 @@ function isOnChatPage(): boolean {
   return CHAT_URL_PATTERNS.some((p) => location.pathname.includes(p));
 }
 
+// ─── Chat Input Insertion ─────────────────────────────────────────────────────
+
+/**
+ * Find the chat input element (textarea or contenteditable div).
+ * Mirrors findAnchorElement priority but returns the raw input, not the form.
+ */
+function findChatInput(): HTMLElement | null {
+  // data-testid is the stable OF attribute; class names change per deploy
+  const byTestId = document.querySelector<HTMLElement>('[data-testid="chat-input"]');
+  if (byTestId) return byTestId;
+  return document.querySelector<HTMLElement>('[role="textbox"]');
+}
+
+/**
+ * Insert text into the OF chat input in a way React recognises.
+ *
+ * Two cases:
+ * 1. <textarea> / <input> — React wraps the native value setter, so we call
+ *    the original descriptor's set() then fire an 'input' event to trigger
+ *    React's synthetic handler.
+ * 2. contenteditable div — execCommand('insertText') is deprecated but still
+ *    the most reliable way to make React's synthetic event system pick up the
+ *    change in a contenteditable without reaching into React internals.
+ *
+ * Falls back to clipboard if no input is found.
+ */
+function insertIntoChat(text: string): void {
+  const input = findChatInput();
+  if (!input) {
+    void navigator.clipboard.writeText(text);
+    return;
+  }
+
+  input.focus();
+
+  if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+    // Bypass React's wrapped setter so the value actually changes,
+    // then fire a bubbling 'input' event so React syncs its state.
+    const proto = Object.getPrototypeOf(input) as HTMLTextAreaElement | HTMLInputElement;
+    const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+    descriptor?.set?.call(input, text);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (input.isContentEditable) {
+    document.execCommand('selectAll');
+    document.execCommand('insertText', false, text);
+  }
+}
+
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
 
 /**
@@ -154,6 +202,7 @@ async function initializeChatAssistant(): Promise<void> {
   console.log(`[OFC] Chat assistant initializing for fan: ${fanId}`);
 
   const overlay = new UIOverlay();
+  overlay.setInsertHandler(insertIntoChat);
   let stopObserver: (() => void) | null = null;
 
   // Retry injection — OF React may not have rendered the anchor yet

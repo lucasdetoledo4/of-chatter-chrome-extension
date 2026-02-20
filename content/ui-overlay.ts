@@ -141,6 +141,11 @@ export class UIOverlay {
   private host: HTMLElement | null = null;
   private shadow: ShadowRoot | null = null;
   private panel: HTMLElement | null = null;
+  private insertHandler: ((text: string) => void) | null = null;
+
+  setInsertHandler(fn: (text: string) => void): void {
+    this.insertHandler = fn;
+  }
 
   inject(anchor: Element): void {
     if (this.isAttached()) return;
@@ -204,7 +209,7 @@ export class UIOverlay {
           >
             <div class="ofc-card-label">${escapeHtml(colors.label)}</div>
             <div class="ofc-card-text">${escapeHtml(s.text)}</div>
-            <span class="ofc-copied">Copied!</span>
+            <span class="ofc-copied">Inserted!</span>
           </div>
         `;
       })
@@ -212,16 +217,22 @@ export class UIOverlay {
 
     this.setContent(`<div class="ofc-suggestions">${cardsHtml}</div>`);
 
-    // Attach click-to-copy handlers after rendering
+    // Attach click-to-insert handlers after rendering
     this.shadow?.querySelectorAll<HTMLElement>('.ofc-card').forEach((card) => {
       card.addEventListener('click', () => {
         const text = card.dataset['text'] ?? '';
-        void navigator.clipboard.writeText(text).then(() => {
+        const showBadge = (): void => {
           const badge = card.querySelector<HTMLElement>('.ofc-copied');
           if (!badge) return;
           badge.classList.add('visible');
           setTimeout(() => badge.classList.remove('visible'), 1500);
-        });
+        };
+        if (this.insertHandler) {
+          this.insertHandler(text);
+          showBadge();
+        } else {
+          void navigator.clipboard.writeText(text).then(showBadge);
+        }
       });
     });
   }
