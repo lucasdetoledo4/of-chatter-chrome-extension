@@ -3,57 +3,80 @@ import type { ConversationMessage } from '../types/index';
 /**
  * Find the container that holds chat messages.
  *
- * Strategy: prefer data-testid (stable OF attribute) over CSS classes
- * (which change frequently across OF deployments). Fall back to the
- * first scrollable child of [role="main"] as a structural heuristic.
+ * Validated against real OF DOM (2025-02):
+ * - Primary: `.b-chat__messages` — the scrollable messages div
+ * - Fallback: `.b-chat__messages-wrapper` — inner wrapper
+ *
+ * OF uses Vue.js (not React). Class names follow a BEM-like pattern
+ * (`b-` for blocks, `m-` for modifiers) and are stable across deploys.
+ * `data-testid` and `[role="main"]` are NOT present in real OF DOM.
  */
 export function findChatContainer(): Element | null {
-  // Primary: OF sometimes uses data-testid on the messages list
-  const byTestId = document.querySelector('[data-testid="chat-messages"]');
-  if (byTestId) return byTestId;
+  const byClass = document.querySelector('.b-chat__messages');
+  if (byClass) return byClass;
 
-  // Secondary: role="main" is a semantic landmark that survives class renames.
-  // We pick the first child that has overflow scroll/auto (the message scroller).
-  const main = document.querySelector('[role="main"]');
-  if (main) {
-    const children = Array.from(main.children);
-    const scrollable = children.find((el) => {
-      const style = window.getComputedStyle(el);
-      return (
-        style.overflowY === 'auto' ||
-        style.overflowY === 'scroll' ||
-        style.overflow === 'auto' ||
-        style.overflow === 'scroll'
-      );
-    });
-    if (scrollable) return scrollable;
-    // If no scrollable child, return main itself as best effort
-    return main;
-  }
+  const byWrapper = document.querySelector('.b-chat__messages-wrapper');
+  if (byWrapper) return byWrapper;
 
   return null;
 }
 
 /**
- * Extract a ConversationMessage from a DOM node if it represents a fan message.
+ * Determine if a `.b-chat__item-message` element is a fan (incoming) message.
  *
- * We detect fan messages via:
- * 1. `data-from-fan="true"` — explicit attribute (used in mock harness + some OF builds)
- * 2. `class.contains('from-fan')` — class heuristic (OF internal naming pattern)
+ * OF does not add a class or data attribute to distinguish fan vs creator
+ * messages — validated against real DOM (2025-02). Direction is purely CSS.
  *
- * We intentionally avoid relying on generated class hashes (e.g. `b_abc123`)
- * because OF's webpack output changes those on every deploy.
+ * Strategy: fan messages are left-aligned, creator messages are right-aligned.
+ * We check whether the horizontal midpoint of the element sits in the left
+ * or right half of the viewport. Falls back to mock harness signals first.
+ */
+function isFanMessage(el: Element): boolean {
+  // Mock harness: explicit attribute takes priority
+  if (
+    el.getAttribute('data-from-fan') === 'true' ||
+    el.classList.contains('from-fan')
+  ) {
+    return true;
+  }
+
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0) return false; // not yet rendered
+
+  const messageMid = rect.left + rect.width / 2;
+  return messageMid < window.innerWidth / 2;
+}
+
+/**
+ * Extract a ConversationMessage from a DOM node.
+ *
+ * Real OF structure (validated 2025-02):
+ *   div.b-chat__item-message
+ *     div.b-chat__message[.m-text][.m-has-media]...
+ *       div.b-chat__message__content
+ *         div.b-chat__message__body
+ *           div.b-chat__message__text   ← text lives here
+ *
+ * The added node may be the item wrapper itself or a deeper child,
+ * so we walk up to find the nearest .b-chat__item-message ancestor.
  */
 export function extractMessageFromNode(node: Node): ConversationMessage | null {
   if (!(node instanceof Element)) return null;
 
-  const isFanMessage =
-    node.getAttribute('data-from-fan') === 'true' ||
-    node.classList.contains('from-fan');
+  // Find the message item — could be the node itself or an ancestor
+  const item: Element | null = node.classList.contains('b-chat__item-message')
+    ? node
+    : node.closest('.b-chat__item-message');
 
-  if (!isFanMessage) return null;
+  if (!item) return null;
 
-  const text = (node.textContent ?? '').trim();
+  // Skip system/timeline messages (e.g. date separators)
+  if (item.querySelector('.b-chat__message__system')) return null;
+
+  if (!isFanMessage(item)) return null;
+
+  const textEl = item.querySelector('.b-chat__message__text');
+  const text = (textEl?.textContent ?? item.textContent ?? '').trim();
   if (!text) return null;
 
   return { role: 'fan', text };
@@ -92,28 +115,28 @@ export function observeChat(
 }
 
 /**
- * Scrape the last N messages from the visible chat history.
+ * Scrape the visible conversation history.
  *
- * We target `[class*="message"]` as a broad net — OF consistently includes
- * "message" in the class names of message bubbles even across class hash changes.
- * Role is inferred from the `from-fan` signals; everything else is creator.
+ * Real OF selectors (validated 2025-02):
+ * - Message items: `.b-chat__item-message`
+ * - Text content:  `.b-chat__message__text`
+ * - Direction:     position-based (left = fan, right = creator)
  */
 export function scrapeConversationHistory(): ConversationMessage[] {
   const container = findChatContainer();
   if (!container) return [];
 
-  // `[class*="message"]` survives webpack class hashing because "message"
-  // is a substring present in all OF message bubble class names.
-  const nodes = Array.from(container.querySelectorAll('[class*="message"]'));
+  const items = Array.from(container.querySelectorAll('.b-chat__item-message'));
 
-  return nodes.reduce<ConversationMessage[]>((acc, node) => {
-    const isFan =
-      node.getAttribute('data-from-fan') === 'true' ||
-      node.classList.contains('from-fan');
+  return items.reduce<ConversationMessage[]>((acc, item) => {
+    // Skip system/timeline entries
+    if (item.querySelector('.b-chat__message__system')) return acc;
 
-    const text = (node.textContent ?? '').trim();
+    const textEl = item.querySelector('.b-chat__message__text');
+    const text = (textEl?.textContent ?? item.textContent ?? '').trim();
     if (!text) return acc;
 
+    const isFan = isFanMessage(item);
     acc.push({ role: isFan ? 'fan' : 'creator', text });
     return acc;
   }, []);

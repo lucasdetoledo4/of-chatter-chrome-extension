@@ -109,10 +109,12 @@ function insertIntoChat(text: string): void {
  * Find the best anchor element to inject the suggestion panel after.
  *
  * Priority:
- * 1. [data-testid="chat-input"] — stable OF attribute
- * 2. [role="textbox"] closest ancestor form — semantic fallback
- * 3. The first <form> on the page — structural fallback
- * 4. document.body — last resort (panel will appear at top)
+ * 1. Mock harness anchor — designated right-pane container
+ * 2. .b-page-content.m-chat-footer — real OF chat footer (validated 2025-02)
+ * 3. .b-chat__btn-submit — send button parent as structural fallback
+ * 4. [data-testid="chat-input"] — legacy guess, kept as fallback
+ * 5. [role="textbox"] closest form — semantic fallback
+ * 6. document.body — last resort
  */
 function findAnchorElement(): Element {
   // Mock harness: inject into the designated right-pane container
@@ -120,6 +122,14 @@ function findAnchorElement(): Element {
     const mockAnchor = document.getElementById(w.__OFC_MOCK_ANCHOR_ID__);
     if (mockAnchor) return mockAnchor;
   }
+
+  // Real OF footer bar (validated against live DOM 2025-02)
+  const chatFooter = document.querySelector('.b-page-content.m-chat-footer');
+  if (chatFooter) return chatFooter;
+
+  // Fallback: parent of send button
+  const sendBtn = document.querySelector('.b-chat__btn-submit');
+  if (sendBtn?.parentElement) return sendBtn.parentElement;
 
   const byTestId = document.querySelector('[data-testid="chat-input"]');
   if (byTestId) return byTestId;
