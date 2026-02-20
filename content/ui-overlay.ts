@@ -320,6 +320,7 @@ const STYLES = `
   .ofc-card:hover .ofc-text {
     color: #b0b0cc;
   }
+
 `;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────

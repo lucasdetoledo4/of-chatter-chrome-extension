@@ -3,14 +3,17 @@ import type { ConversationMessage } from '../types/index';
 /**
  * Find the container that holds chat messages.
  *
- * Validated against real OF DOM (2025-02):
- * - Primary:  .b-chat__messages      — outer scrollable div
- * - Secondary: .b-chat__messages-wrapper — inner wrapper (fallback)
- * - Tertiary: [data-testid="chat-messages"] — mock harness
+ * Strategy: infer the container by walking up from a known message element.
+ * [at-attr="chat_message"] is validated against real OF DOM (2026-02) and is
+ * stable. Its parentElement is the scrollable message list regardless of what
+ * CSS class OF assigns the wrapper — making this approach resilient to class
+ * name changes.
  *
- * OF uses Vue.js. Class names follow BEM (.b- blocks, .m- modifiers)
- * and are stable across deploys. data-testid and [role="main"] are
- * NOT present in real OF DOM.
+ * Class-name guesses (.b-chat__messages, .b-chat__messages-wrapper) are kept
+ * as fast-path checks in case they ever resolve, but the at-attr walk-up is
+ * the reliable fallback.
+ *
+ * [data-testid="chat-messages"] is the mock harness signal only.
  */
 export function findChatContainer(): Element | null {
   const byClass = document.querySelector('.b-chat__messages');
@@ -18,6 +21,11 @@ export function findChatContainer(): Element | null {
 
   const byWrapper = document.querySelector('.b-chat__messages-wrapper');
   if (byWrapper) return byWrapper;
+
+  // Validated 2026-02: walk up from any known message element.
+  // at-attr="chat_message" is stable; its parent is the scrollable list.
+  const anyMessage = document.querySelector('[at-attr="chat_message"]');
+  if (anyMessage?.parentElement) return anyMessage.parentElement;
 
   // Mock harness fallback
   const byTestId = document.querySelector('[data-testid="chat-messages"]');
@@ -92,6 +100,30 @@ export function extractMessageFromNode(node: Node): ConversationMessage | null {
   if (!text) return null;
 
   return { role: 'fan', text };
+}
+
+/**
+ * Scrape the fan's display name from the current page.
+ *
+ * Primary source: document.title — OF sets it to "DisplayName | OnlyFans"
+ * on individual chat pages, which is stable and requires no DOM traversal.
+ * Fallbacks: BEM chat-header selectors (not yet validated on real OF DOM).
+ */
+export function scrapeFanName(): string | null {
+  // Primary: page title — reliable, no DOM traversal needed
+  const titleMatch = document.title.match(/^(.+?)\s*[|·—-]\s*OnlyFans/i);
+  if (titleMatch?.[1]) {
+    const name = titleMatch[1].trim();
+    if (name && name.toLowerCase() !== 'onlyfans') return name;
+  }
+  // Fallback: chat header h1 — validated against real OF DOM (2026-02).
+  // at-attr="page_title" is the stable attribute; g-page-title is the BEM class.
+  const nameEl =
+    document.querySelector<HTMLElement>('h1[at-attr="page_title"]') ??
+    document.querySelector<HTMLElement>('[at-attr="chat_header"] .g-user-name') ??
+    document.querySelector<HTMLElement>('.b-chat__header .g-user-name') ??
+    document.querySelector<HTMLElement>('[class*="chat__user-name"]');
+  return nameEl?.textContent?.trim() || null;
 }
 
 /**

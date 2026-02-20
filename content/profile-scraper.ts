@@ -37,10 +37,13 @@ function textOf(el: Element | null): string {
 export function scrapeCreatorProfile(): ScrapedProfile | null {
   // Only run on pages that look like a creator profile
   const pathname = location.pathname;
+  // Known OF section pages that are NOT creator profiles.
+  // Kept as a blocklist rather than an allowlist so new OF routes don't silently break.
+  const OF_SECTIONS = /^\/(my|following|collections|notifications|messages|bookmarks|statistics|vault|explore|home|add|edit|settings|subscribers|payments|search)\b/i;
   const isProfilePage =
-    pathname.startsWith('/my/') ||
-    /^\/@[^/]+$/.test(pathname) ||
-    pathname.startsWith('/u/');
+    /^\/@[^/]+\/?$/.test(pathname) ||          // /@username
+    pathname.startsWith('/u/') ||               // /u/123456
+    (/^\/[^/]+\/?$/.test(pathname) && !OF_SECTIONS.test(pathname));  // bare /username
 
   if (!isProfilePage) return null;
 
@@ -92,4 +95,49 @@ export function scrapeCreatorProfile(): ScrapedProfile | null {
   const result: ScrapedProfile = { displayName, bio, profilePhotoUrl, recentCaptions };
   console.log('[OFC] Profile scraped:', result);
   return result;
+}
+
+/**
+ * Scrape the logged-in creator's display name from the persistent sidebar nav.
+ *
+ * Validated against real OF DOM (2026-02):
+ * - [class*="sidebar"] .g-user-name  — creator display name
+ * - [class*="sidebar"] .g-user-username — @username (used as fallback ID)
+ *
+ * Available on every OF page, so this runs on chat pages without needing to
+ * navigate to the creator's profile page.
+ */
+export function scrapeCreatorFromNav(): { displayName: string; username: string | null } | null {
+  const nameEl = document.querySelector('[class*="sidebar"] .g-user-name');
+  const displayName = nameEl?.textContent?.trim() ?? '';
+  if (!displayName) return null;
+
+  const usernameEl = document.querySelector('[class*="sidebar"] .g-user-username');
+  const username = usernameEl?.textContent?.trim().replace(/^@/, '') || null;
+
+  return { displayName, username };
+}
+
+/**
+ * Diagnostic: run all profile selectors independently and log results.
+ * Call window.__OFC_diagnoseProfile() in DevTools on a real OF profile page
+ * to validate which selectors resolve vs. which need updating.
+ */
+export function diagnoseProfileScraper(): void {
+  console.group('[OFC] Profile scraper diagnostic');
+  console.log('pathname:', location.pathname);
+  const checks: [string, Element | null][] = [
+    ['h1.g-page-title',                    document.querySelector('h1.g-page-title')],
+    ['[class*="profile__name"] h1',        document.querySelector('[class*="profile__name"] h1')],
+    ['[class*="userAvatar__name"]',        document.querySelector('[class*="userAvatar__name"]')],
+    ['h1 (any)',                           document.querySelector('h1')],
+    ['[class*="profile__about"]',          document.querySelector('[class*="profile__about"]')],
+    ['[class*="b-profile__description"]',  document.querySelector('[class*="b-profile__description"]')],
+    ['.g-avatar img',                      document.querySelector('.g-avatar img')],
+    ['[class*="b-post__text"] (first)',    document.querySelector('[class*="b-post__text"]')],
+  ];
+  for (const [label, el] of checks) {
+    console.log(`${el ? '✓' : '✗'} ${label}`, el ?? 'NOT FOUND');
+  }
+  console.groupEnd();
 }
