@@ -40,13 +40,18 @@ const STYLES = `
   #ofc-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  #ofc-header-left {
+    display: flex;
+    align-items: center;
     gap: 6px;
     font-size: 11px;
     font-weight: 600;
     color: #6b7280;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 10px;
   }
   #ofc-header span.dot {
     width: 6px;
@@ -54,6 +59,29 @@ const STYLES = `
     border-radius: 50%;
     background: #22c55e;
     display: inline-block;
+  }
+  #ofc-regenerate {
+    background: none;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: #6b7280;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.1s, color 0.1s;
+  }
+  #ofc-regenerate:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+  #ofc-regenerate.visible {
+    display: flex;
+  }
+  #ofc-regenerate.spinning svg {
+    animation: spin 0.7s linear infinite;
   }
   .ofc-loading {
     display: flex;
@@ -142,9 +170,14 @@ export class UIOverlay {
   private shadow: ShadowRoot | null = null;
   private panel: HTMLElement | null = null;
   private insertHandler: ((text: string) => void) | null = null;
+  private regenerateHandler: (() => void) | null = null;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
+  }
+
+  setRegenerateHandler(fn: () => void): void {
+    this.regenerateHandler = fn;
   }
 
   inject(anchor: Element): void {
@@ -171,8 +204,23 @@ export class UIOverlay {
 
     const header = document.createElement('div');
     header.id = 'ofc-header';
-    header.innerHTML = '<span class="dot"></span> AI Suggestions';
+    header.innerHTML = `
+      <span id="ofc-header-left"><span class="dot"></span> AI Suggestions</span>
+      <button id="ofc-regenerate" title="Regenerate suggestions">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Regenerate
+      </button>
+    `;
     panel.appendChild(header);
+
+    // Wire regenerate button — handler set later via setRegenerateHandler()
+    const regenBtn = header.querySelector<HTMLButtonElement>('#ofc-regenerate')!;
+    regenBtn.addEventListener('click', () => {
+      if (this.regenerateHandler) this.regenerateHandler();
+    });
 
     shadow.appendChild(panel);
 
@@ -187,6 +235,7 @@ export class UIOverlay {
 
   showLoading(): void {
     if (!this.panel) return;
+    this.setRegenVisible(false);
     this.setContent(`
       <div class="ofc-loading">
         <div class="ofc-spinner"></div>
@@ -216,6 +265,7 @@ export class UIOverlay {
       .join('');
 
     this.setContent(`<div class="ofc-suggestions">${cardsHtml}</div>`);
+    this.setRegenVisible(true);
 
     // Attach click-to-insert handlers after rendering
     this.shadow?.querySelectorAll<HTMLElement>('.ofc-card').forEach((card) => {
@@ -239,6 +289,7 @@ export class UIOverlay {
 
   showError(msg: string): void {
     if (!this.panel) return;
+    this.setRegenVisible(true); // allow retry on error
     this.setContent(
       `<div class="ofc-error">⚠ ${escapeHtml(msg)}</div>`
     );
@@ -249,6 +300,12 @@ export class UIOverlay {
     this.host = null;
     this.shadow = null;
     this.panel = null;
+  }
+
+  private setRegenVisible(visible: boolean): void {
+    const btn = this.shadow?.querySelector<HTMLElement>('#ofc-regenerate');
+    if (!btn) return;
+    btn.classList.toggle('visible', visible);
   }
 
   /** Replace the panel body content (preserves header). */

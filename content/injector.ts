@@ -152,7 +152,8 @@ async function requestSuggestions(
 async function handleNewMessage(
   msg: ConversationMessage,
   fanId: string,
-  overlay: UIOverlay
+  overlay: UIOverlay,
+  onRequest: (req: GetSuggestionsRequest) => void
 ): Promise<void> {
   overlay.showLoading();
 
@@ -165,7 +166,6 @@ async function handleNewMessage(
       messageCount: 1,
     });
   } else {
-    // Bump message count and update lastSeen
     fanProfile = await upsertFanProfile(fanId, {
       messageCount: fanProfile.messageCount + 1,
       lastSeen: new Date().toISOString(),
@@ -179,13 +179,24 @@ async function handleNewMessage(
   const conversation: ConversationMessage[] =
     lastScraped?.text === msg.text ? history : [...history, msg];
 
-  const response = await requestSuggestions({
+  const req: GetSuggestionsRequest = {
     type: 'GET_SUGGESTIONS',
     conversation,
     fanProfile,
     creatorPersona: DEFAULT_PERSONA,
-  });
+  };
 
+  // Expose the request so regenerate can replay it
+  onRequest(req);
+
+  await fireSuggestionsRequest(req, overlay);
+}
+
+async function fireSuggestionsRequest(
+  req: GetSuggestionsRequest,
+  overlay: UIOverlay
+): Promise<void> {
+  const response = await requestSuggestions(req);
   if (response.success) {
     overlay.showSuggestions(response.suggestions);
   } else {
@@ -203,6 +214,13 @@ async function initializeChatAssistant(): Promise<void> {
 
   const overlay = new UIOverlay();
   overlay.setInsertHandler(insertIntoChat);
+
+  // Last request is stored so regenerate can replay it
+  let lastRequest: GetSuggestionsRequest | null = null;
+  overlay.setRegenerateHandler(() => {
+    if (lastRequest) void fireSuggestionsRequest(lastRequest, overlay);
+  });
+
   let stopObserver: (() => void) | null = null;
 
   // Retry injection — OF React may not have rendered the anchor yet
@@ -227,7 +245,7 @@ async function initializeChatAssistant(): Promise<void> {
   const startObserver = (): void => {
     stopObserver?.();
     stopObserver = observeChat((msg) => {
-      void handleNewMessage(msg, fanId, overlay);
+      void handleNewMessage(msg, fanId, overlay, (req) => { lastRequest = req; });
     });
   };
 
