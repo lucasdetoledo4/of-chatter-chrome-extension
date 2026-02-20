@@ -8,11 +8,11 @@ import type {
   AnalyzeCreatorStyleRequest,
   CreatorType,
 } from '../types/index';
-import { observeChat, scrapeConversationHistory, findChatContainer } from './dom-observer';
+import { observeChat, scrapeConversationHistory, findChatContainer, scrapeFanName } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
 import { upsertFanProfile, getFanProfile, getCreatorProfile, upsertCreatorProfile } from '../utils/storage';
 import { CREATOR_PRESETS, pickVariationHint } from '../utils/prompt-builder';
-import { scrapeCreatorProfile } from './profile-scraper';
+import { scrapeCreatorProfile, scrapeCreatorFromNav, diagnoseProfileScraper } from './profile-scraper';
 
 console.log('[OFC] Content script loaded.');
 
@@ -243,6 +243,13 @@ async function handleNewMessage(
     });
   }
 
+  // Enrich displayName from page if it's still the raw fanId
+  const scrapedName = scrapeFanName();
+  if (scrapedName && fanProfile.displayName === fanId) {
+    fanProfile = await upsertFanProfile(fanId, { displayName: scrapedName });
+    console.log(`[OFC] Fan name scraped: "${scrapedName}"`);
+  }
+
   // Build conversation context (scraped history + new message appended)
   const history = scrapeConversationHistory();
   // Avoid duplicating the triggering message if it was already scraped
@@ -309,6 +316,20 @@ async function initializeChatAssistant(): Promise<void> {
 
   // Load creator type (popup setting) and cached creator profile
   await loadCreatorState();
+
+  // Scrape creator identity from the sidebar nav — available on every page,
+  // so we get the real name without requiring a profile page visit.
+  // Guard: reject the result if it matches the chat partner's name. This prevents
+  // the DOM selector from picking up the chat partner's name from the sidebar
+  // conversation list instead of the logged-in user's nav identity.
+  const chatPartnerName = scrapeFanName();
+  const navCreator = scrapeCreatorFromNav();
+  if (navCreator && navCreator.displayName !== chatPartnerName) {
+    cachedCreatorProfile = await upsertCreatorProfile('self', { displayName: navCreator.displayName });
+    console.log(`[OFC] Creator name from nav: "${navCreator.displayName}"`);
+  } else if (navCreator) {
+    console.warn(`[OFC] Nav selector returned chat partner's name ("${navCreator.displayName}") — skipping to avoid overwriting creator identity.`);
+  }
 
   const overlay = new UIOverlay();
   overlay.setInsertHandler(insertIntoChat);
@@ -420,10 +441,29 @@ if (isOnChatPage()) {
 }
 
 // ─── DevTools Diagnostic ──────────────────────────────────────────────────────
-// Run window.__OFC_diagnose() in the DevTools console on a real OF chat page
-// to see exactly what the extension finds (or fails to find) in the DOM.
+// Content scripts run in an isolated world — window.__OFC_* set here would be
+// invisible to the DevTools console (which runs in the page's main world).
+// Fix: inject thin shim functions into the main world that postMessage back to
+// this isolated script, which retains full chrome.* API access.
 
-(window as typeof window & { __OFC_diagnose: () => void }).__OFC_diagnose = () => {
+// Inject via src (not inline) to satisfy OF's Content Security Policy.
+// content/diag-bridge.js is declared in web_accessible_resources so the
+// extension origin is trusted by OF's CSP allowlist.
+const _diagBridge = document.createElement('script');
+_diagBridge.src = chrome.runtime.getURL('content/diag-bridge.js');
+_diagBridge.onload = () => _diagBridge.remove();
+document.documentElement.appendChild(_diagBridge);
+
+window.addEventListener('message', (e: MessageEvent) => {
+  if (!e.data?.__ofc) return;
+
+  if (e.data.fn === 'diagnoseProfile') {
+    diagnoseProfileScraper();
+    return;
+  }
+
+  if (e.data.fn !== 'diagnose') return;
+
   console.group('[OFC] Diagnostic report');
 
   // URL / routing
@@ -489,6 +529,55 @@ if (isOnChatPage()) {
   }
   console.groupEnd();
 
+  // Fan name scraping
+  console.group('Fan name (dom-observer.ts › scrapeFanName)');
+  console.log('document.title:', document.title);
+  const titleMatch = document.title.match(/^(.+?)\s*[|·—-]\s*OnlyFans/i);
+  console.log('title regex match:', titleMatch ?? 'NO MATCH');
+  if (titleMatch?.[1]) {
+    const candidate = titleMatch[1].trim();
+    console.log('candidate name:', candidate, candidate.toLowerCase() === 'onlyfans' ? '← REJECTED' : '← OK');
+  }
+  const scrapedFanName = scrapeFanName();
+  console.log('scrapeFanName() result:', scrapedFanName ?? 'null — falling back to fanId');
+  if (!scrapedFanName) {
+    const fallbackEls = [
+      '[at-attr="chat_header"] .g-user-name',
+      '.b-chat__header .g-user-name',
+      '[class*="chat__user-name"]',
+      '[data-testid="chat-partner-name"]',
+    ];
+    for (const sel of fallbackEls) {
+      const el = document.querySelector(sel);
+      console.log(`  ${el ? '✓' : '✗'} ${sel}`, el ?? '');
+    }
+  }
+  console.groupEnd();
+
+  // Creator identity (logged-in user — present on all pages via nav/sidebar)
+  console.group('Creator identity from nav (candidate selectors)');
+  const navCandidates: [string, Element | null][] = [
+    ['[at-attr="nav_username"]',           document.querySelector('[at-attr="nav_username"]')],
+    ['[at-attr="sidebar_username"]',       document.querySelector('[at-attr="sidebar_username"]')],
+    ['.b-sidebar__user .g-user-name',      document.querySelector('.b-sidebar__user .g-user-name')],
+    ['.b-nav__user .g-user-name',          document.querySelector('.b-nav__user .g-user-name')],
+    ['.b-navigation .g-user-name',         document.querySelector('.b-navigation .g-user-name')],
+    ['[class*="sidebar"] .g-user-name',    document.querySelector('[class*="sidebar"] .g-user-name')],
+    ['[class*="sidebar"] .g-user-username',document.querySelector('[class*="sidebar"] .g-user-username')],
+    ['[class*="nav__user"]',               document.querySelector('[class*="nav__user"]')],
+  ];
+  for (const [sel, el] of navCandidates) {
+    console.log(`${el ? '✓' : '✗'} ${sel}`, el ?? '');
+  }
+  console.groupEnd();
+
+  // Creator profile
+  console.group('Creator profile (stored)');
+  chrome.storage.local.get('creator:self')
+    .then((r) => console.log('[OFC] stored creator:self:', r['creator:self'] ?? 'nothing stored yet'))
+    .catch(() => {});
+  console.groupEnd();
+
   // Panel injection
   console.group('Panel (ui-overlay.ts)');
   const host = document.getElementById('ofc-suggestion-host');
@@ -496,4 +585,4 @@ if (isOnChatPage()) {
   console.groupEnd();
 
   console.groupEnd();
-};
+});

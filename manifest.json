@@ -22,6 +22,12 @@
     "https://onlyfans.com/*",
     "https://api.anthropic.com/*"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content/diag-bridge.js"],
+      "matches": ["https://onlyfans.com/*"]
+    }
+  ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "OF Chatter Assistant"
