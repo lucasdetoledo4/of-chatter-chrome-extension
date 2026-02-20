@@ -41,9 +41,18 @@ export interface ConversationMessage {
 
 // ─── Creator Persona ──────────────────────────────────────────────────────────
 
+export type CreatorType =
+  | 'egirl'          // young, playful, teasing, emoji-heavy, FOMO-driven
+  | 'woman'          // standard female creator, warm, confident, sensual
+  | 'mature_woman'   // experienced, nurturing-but-seductive, fewer emojis
+  | 'man'            // gym/lifestyle, masculine, direct, confident
+  | 'picture_only'   // photo sets focus, visual language, gallery teasers
+  | 'video_creator'  // custom clips, motion language, behind-the-scenes
+  | 'couple';        // "we" language, voyeuristic angle, double content
+
 export interface CreatorPersona {
   name: string;
-  description: string; // tone/style description for the AI prompt
+  type: CreatorType;
 }
 
 // ─── Background Messaging ─────────────────────────────────────────────────────
@@ -53,6 +62,8 @@ export interface GetSuggestionsRequest {
   conversation: ConversationMessage[];
   fanProfile: FanProfile;
   creatorPersona: CreatorPersona;
+  /** Injected on regenerate to push the model toward a different style */
+  variationHint?: string;
 }
 
 // Discriminated union — add more message types here as the extension grows
@@ -72,6 +83,7 @@ export interface AnthropicMessage {
 export interface AnthropicApiRequest {
   model: string;
   max_tokens: number;
+  temperature?: number;
   system: string;
   messages: AnthropicMessage[];
 }

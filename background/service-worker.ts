@@ -48,13 +48,14 @@ async function handleMessage(
   request: BackgroundRequest
 ): Promise<BackgroundResponse> {
   if (request.type === 'GET_SUGGESTIONS') {
-    const { conversation, fanProfile, creatorPersona } = request;
+    const { conversation, fanProfile, creatorPersona, variationHint } = request;
 
     const apiKey = await getApiKey();
     const { system, user } = buildSuggestionPrompt({
       conversation,
       fanProfile,
       creatorPersona,
+      variationHint,
     });
 
     // Use fallback model for long/complex conversations
@@ -106,6 +107,7 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
   const body: AnthropicApiRequest = {
     model,
     max_tokens: 1024,
+    temperature: 1.0, // max diversity — safe with our structured JSON output contract
     system,
     messages: [{ role: 'user', content: user }],
   };
