@@ -296,3 +296,82 @@ navObserver.observe(document.body, { childList: true, subtree: true });
 if (isOnChatPage()) {
   void initializeChatAssistant();
 }
+
+// ─── DevTools Diagnostic ──────────────────────────────────────────────────────
+// Run window.__OFC_diagnose() in the DevTools console on a real OF chat page
+// to see exactly what the extension finds (or fails to find) in the DOM.
+
+(window as typeof window & { __OFC_diagnose: () => void }).__OFC_diagnose = () => {
+  console.group('[OFC] Diagnostic report');
+
+  // URL / routing
+  console.group('Routing');
+  console.log('pathname:', location.pathname);
+  console.log('isOnChatPage:', isOnChatPage());
+  console.log('fanId:', extractFanIdFromUrl(location.pathname));
+  console.groupEnd();
+
+  // Chat container
+  console.group('Chat container (dom-observer.ts › findChatContainer)');
+  const byTestId = document.querySelector('[data-testid="chat-messages"]');
+  console.log('[data-testid="chat-messages"]:', byTestId ?? 'NOT FOUND');
+  const byRole = document.querySelector('[role="main"]');
+  console.log('[role="main"]:', byRole ?? 'NOT FOUND');
+  if (byRole) {
+    const scrollable = Array.from(byRole.children).find((el) => {
+      const s = window.getComputedStyle(el);
+      return s.overflowY === 'auto' || s.overflowY === 'scroll';
+    });
+    console.log('  first scrollable child of [role="main"]:', scrollable ?? 'NOT FOUND');
+  }
+  console.groupEnd();
+
+  // Message nodes
+  console.group('Message nodes (dom-observer.ts › extractMessageFromNode)');
+  const container = byTestId ?? byRole;
+  if (container) {
+    const allMessages = Array.from(container.querySelectorAll('[class*="message"]'));
+    console.log(`[class*="message"] nodes found: ${allMessages.length}`);
+    const fanMessages = allMessages.filter(
+      (n) => n.getAttribute('data-from-fan') === 'true' || n.classList.contains('from-fan')
+    );
+    console.log(`fan messages detected: ${fanMessages.length}`);
+    if (allMessages.length > 0) {
+      console.log('sample node classes:', allMessages[0]?.className);
+    }
+  } else {
+    console.warn('No container found — cannot inspect message nodes');
+  }
+  console.groupEnd();
+
+  // Anchor / chat input
+  console.group('Anchor element (injector.ts › findAnchorElement)');
+  const anchor = findAnchorElement();
+  console.log('resolved anchor:', anchor);
+  console.log('  via [data-testid="chat-input"]:', document.querySelector('[data-testid="chat-input"]') ?? 'NOT FOUND');
+  console.log('  via [role="textbox"]:', document.querySelector('[role="textbox"]') ?? 'NOT FOUND');
+  console.log('  via form:', document.querySelector('form') ?? 'NOT FOUND');
+  console.groupEnd();
+
+  // Chat input type (affects insertion strategy)
+  console.group('Chat input type (injector.ts › insertIntoChat)');
+  const input = findChatInput();
+  if (input) {
+    console.log('element:', input);
+    console.log('tag:', input.tagName);
+    console.log('isContentEditable:', input.isContentEditable);
+    console.log('type:', input instanceof HTMLInputElement ? input.type : 'n/a');
+    console.log('insertion strategy:', input.isContentEditable ? 'execCommand' : 'native value setter');
+  } else {
+    console.warn('No chat input found — insertion will fall back to clipboard');
+  }
+  console.groupEnd();
+
+  // Panel injection
+  console.group('Panel (ui-overlay.ts)');
+  const host = document.getElementById('ofc-suggestion-host');
+  console.log('shadow host in DOM:', host ?? 'NOT FOUND (panel not injected)');
+  console.groupEnd();
+
+  console.groupEnd();
+};
