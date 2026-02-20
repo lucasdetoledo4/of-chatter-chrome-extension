@@ -10,7 +10,7 @@
 
 - `feat` — new feature
 - `fix` — bug fix
-- `chore` — build, deps, config, tooling
+- `chore` — build, deps, config, tooling (not app code)
 - `refactor` — code change with no behavior change
 - `style` — formatting, naming
 - `docs` — documentation only
