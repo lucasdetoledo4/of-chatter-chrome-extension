@@ -21,7 +21,11 @@ const SPA_NAV_DEBOUNCE_MS = 300;
 const CHAT_URL_PATTERNS = ['/my/chats/', '/messages/'];
 
 // Allow mock harness to bypass URL checks (set before this script loads)
-const w = window as typeof window & { __OFC_MOCK__?: boolean; __OFC_MOCK_FAN_ID__?: string };
+const w = window as typeof window & {
+  __OFC_MOCK__?: boolean;
+  __OFC_MOCK_FAN_ID__?: string;
+  __OFC_MOCK_ANCHOR_ID__?: string;
+};
 
 // Default persona used until popup settings are implemented
 const DEFAULT_PERSONA: CreatorPersona = {
@@ -60,6 +64,12 @@ function isOnChatPage(): boolean {
  * 4. document.body — last resort (panel will appear at top)
  */
 function findAnchorElement(): Element {
+  // Mock harness: inject into the designated right-pane container
+  if (w.__OFC_MOCK_ANCHOR_ID__) {
+    const mockAnchor = document.getElementById(w.__OFC_MOCK_ANCHOR_ID__);
+    if (mockAnchor) return mockAnchor;
+  }
+
   const byTestId = document.querySelector('[data-testid="chat-input"]');
   if (byTestId) return byTestId;
 

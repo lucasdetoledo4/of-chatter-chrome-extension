@@ -188,6 +188,19 @@
       margin-top: 6px;
       min-height: 16px;
     }
+    .ai-section {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .ai-section h3 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
     .console-section {
       border-top: 1px solid #e5e7eb;
       padding: 12px 16px;
@@ -271,6 +284,11 @@
       <h3>Simulate Fan Message</h3>
       <button id="simulate-btn">▶ Send Fan Message</button>
       <div id="fan-msg-preview"></div>
+    </div>
+
+    <div class="ai-section">
+      <h3>AI Suggestions</h3>
+      <div id="ai-panel-container" data-ofc-container></div>
     </div>
 
     <div class="console-section">
@@ -441,10 +459,11 @@ Respond ONLY with the JSON array. No preamble, no explanation, no markdown fence
     scripting: {},
   };
 
-  // ── Mock flag — lets injector.ts skip the URL check ───────
-  // Must be set BEFORE injector.js loads (replaceState may throw on file://)
+  // ── Mock flags — set BEFORE injector.js loads ─────────────
   window.__OFC_MOCK__ = true;
   window.__OFC_MOCK_FAN_ID__ = '1234567';
+  // Redirect the suggestion panel into the right pane instead of below the chat input
+  window.__OFC_MOCK_ANCHOR_ID__ = 'ai-panel-container';
 
   // ── API key persistence ───────────────────────────────────
   // Set this up BEFORE replaceState so a throw can't kill the listener.
