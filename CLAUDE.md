@@ -11,6 +11,8 @@
 
 Before creating any git commit, you MUST read `COMMITS.md` first and follow its conventions exactly.
 
+After completing any set of changes requested by the user, always create a commit before moving on. Do not batch unrelated sessions of work into one commit — commit at logical completion points.
+
 ---
 
 ## Project Overview
