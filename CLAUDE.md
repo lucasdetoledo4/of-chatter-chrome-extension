@@ -5,6 +5,7 @@
 - **`docs/DECISIONS.md`** — full rationale for every architectural decision, DOM strategy,
   prompt design choices, mock harness design, and sources used. Read before making changes.
 - **`tasks/todo.md`** — implementation progress and backlog.
+- **`SUGGESTIONS.md`** — deferred ideas and nice-to-haves. Review before planning new work.
 - **`COMMITS.md`** — commit message conventions.
 
 ## Commits
