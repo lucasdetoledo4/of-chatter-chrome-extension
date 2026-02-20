@@ -5,7 +5,7 @@ import type {
   BackgroundResponse,
   GetSuggestionsRequest,
 } from '../types/index';
-import { observeChat, scrapeConversationHistory } from './dom-observer';
+import { observeChat, scrapeConversationHistory, findChatContainer } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
 import { upsertFanProfile, getFanProfile } from '../utils/storage';
 import { CREATOR_PRESETS, pickVariationHint } from '../utils/prompt-builder';
@@ -40,14 +40,28 @@ function getActivePersona(): CreatorPersona {
 // ─── URL Helpers ──────────────────────────────────────────────────────────────
 
 /**
- * Extract the fan/conversation ID from OF chat URLs:
- * - /my/chats/:id
- * - /messages/:id
+ * Extract the fan/conversation ID from OF chat URLs.
+ *
+ * Observed URL formats (validated 2025-02):
+ * - /my/chats/chat/{userId}   — individual conversation
+ * - /my/chats/                — chat list (no fan ID, skip)
+ * - /messages/{userId}        — alternate route
+ *
+ * The extra "chat" path segment before the numeric user ID is specific
+ * to OF's router and must be skipped.
  */
 function extractFanIdFromUrl(pathname: string): string | null {
   if (w.__OFC_MOCK__) return w.__OFC_MOCK_FAN_ID__ ?? 'mock-fan';
-  const match = pathname.match(/(?:\/my\/chats\/|\/messages\/)([^/?#]+)/);
-  return match?.[1] ?? null;
+
+  // Handle /my/chats/chat/{userId}
+  const chatMatch = pathname.match(/\/my\/chats\/chat\/([^/?#]+)/);
+  if (chatMatch) return chatMatch[1];
+
+  // Handle /messages/{userId}
+  const msgMatch = pathname.match(/\/messages\/([^/?#]+)/);
+  if (msgMatch) return msgMatch[1];
+
+  return null;
 }
 
 function isOnChatPage(): boolean {
@@ -241,7 +255,7 @@ async function initializeChatAssistant(): Promise<void> {
 
   let stopObserver: (() => void) | null = null;
 
-  // Retry injection — OF React may not have rendered the anchor yet
+  // Retry injection — OF Vue app may not have rendered the anchor yet
   let attempts = 0;
   const tryInject = (): void => {
     if (overlay.isAttached()) return;
@@ -260,8 +274,21 @@ async function initializeChatAssistant(): Promise<void> {
     }
   };
 
+  // Retry the observer separately — the chat container (b-chat__messages) is
+  // rendered by Vue asynchronously and may not exist when the overlay first attaches.
+  let observerAttempts = 0;
   const startObserver = (): void => {
     stopObserver?.();
+    if (!findChatContainer()) {
+      if (observerAttempts < INJECT_RETRY_LIMIT) {
+        observerAttempts++;
+        setTimeout(startObserver, INJECT_RETRY_DELAY_MS);
+      } else {
+        console.warn('[OFC] Chat container never appeared — observer not started.');
+      }
+      return;
+    }
+    observerAttempts = 0;
     stopObserver = observeChat((msg) => {
       void handleNewMessage(msg, fanId, overlay, (req) => { lastRequest = req; });
     });
