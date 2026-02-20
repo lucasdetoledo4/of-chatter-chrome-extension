@@ -7,6 +7,10 @@
 - **`tasks/todo.md`** — implementation progress and backlog.
 - **`COMMITS.md`** — commit message conventions.
 
+## Commits
+
+Before creating any git commit, you MUST read `COMMITS.md` first and follow its conventions exactly.
+
 ---
 
 ## Project Overview
@@ -243,3 +247,41 @@ Store sensitive config in `chrome.storage.sync` (user-set via popup), not hardco
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+
+---
+
+## Design Standards
+
+When making any UI or UX decision, reason like a **senior product designer at a B2B SaaS company**. This extension is a professional tool used under time pressure by agency operators. Every design choice must serve that user.
+
+### Design Philosophy
+
+- **Tool, not widget**: The panel must feel like a precision instrument, not a marketing pop-up. Think VS Code's suggestion dropdown, Linear's command palette — purposeful, quiet, fast.
+- **Dark-first**: OF's UI is dark. The extension panel must match the environment — a jarring white box is amateur. Default to dark surfaces (`#0e0e14` range), muted borders, low-contrast chrome.
+- **Information hierarchy**: Labels, badges, and secondary text should be visually subordinate to the content the chatter actually reads (the suggestion text). If your eyes go to the wrong thing first, the hierarchy is wrong.
+- **Density with breathing room**: This is a compact tool in a tight space. Be dense enough to show all 3 suggestions without scrolling, but never crowded. 9-11px padding on tight elements, 13px body text.
+- **Earn every pixel**: No decorative elements that don't serve a function. No gradients for vibes, no emojis in UI chrome, no borders that don't create meaningful separation.
+
+### Interaction Design
+
+- **Primary action must be obvious**: The chatter's goal is to click a suggestion and send it. That action must be one click, instantly discoverable, never ambiguous.
+- **Hover reveals, not click**: Progressive disclosure via hover is fine for secondary actions (the "Use →" button, regenerate). Don't hide the primary action.
+- **Feedback must be immediate**: Clicks that trigger async work must show a loading state within 1 frame. "Inserted" feedback must be instant and clear (color change, text change), not a toast.
+- **Never block reading**: Loading spinners and error states must not shift the layout. Reserve the panel space, swap the content.
+- **Collapse is an escape valve**: Chatters should be able to get the panel out of their way with one click when it's not needed. Never trap them.
+
+### Visual System
+
+- **Colors**: Use a consistent 5-color role system per suggestion type. Each type owns one accent color (emerald / amber / violet). These colors appear ONLY as left border accents and badge tints — never as full card backgrounds.
+- **Typography**: System font stack only (no web fonts). 13px body, 9-10px labels, 700 weight for uppercase badges, 400 for body text. Line-height 1.5 on body text.
+- **Motion**: Animations must be sub-200ms and respect reduced-motion preferences. Use fade + translate(4px) entrance. No bounces, no elastic easing.
+- **Border radius**: 12px on the panel, 6-8px on buttons and badges, 100px (pill) on type badges. Consistent hierarchy.
+- **Shadows**: One shadow per elevation level. Panel uses `0 8px 32px rgba(0,0,0,0.5)`. Buttons use no shadow. No neumorphism.
+
+### Review Checklist (before shipping any UI change)
+
+1. Does it work in the mock harness without looking broken?
+2. Does it pass the "3-second scan test" — can a chatter read all 3 suggestions in 3 seconds?
+3. Is the primary action (click to insert) discoverable without explanation?
+4. Does it look intentional at 100%, 125%, and 150% browser zoom?
+5. Would you be comfortable shipping this to a paying customer today?

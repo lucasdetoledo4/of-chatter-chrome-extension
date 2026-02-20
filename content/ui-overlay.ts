@@ -2,158 +2,327 @@ import type { Suggestion, SuggestionType } from '../types/index';
 
 const HOST_ID = 'ofc-suggestion-host';
 
-const CARD_COLORS: Record<SuggestionType, { bg: string; border: string; label: string }> = {
+// ─── Type configuration ───────────────────────────────────────────────────────
+
+interface TypeConfig {
+  accent: string;      // left border color
+  labelBg: string;     // badge background
+  labelColor: string;  // badge text
+  label: string;       // display label
+}
+
+const TYPE_CONFIG: Record<SuggestionType, TypeConfig> = {
   engage: {
-    bg: '#f0fdf4',
-    border: '#86efac',
+    accent: '#10b981',
+    labelBg: 'rgba(16, 185, 129, 0.12)',
+    labelColor: '#34d399',
     label: 'Engage',
   },
   soft_upsell: {
-    bg: '#fff7ed',
-    border: '#fdba74',
-    label: 'Soft Upsell',
+    accent: '#f59e0b',
+    labelBg: 'rgba(245, 158, 11, 0.12)',
+    labelColor: '#fbbf24',
+    label: 'Soft Sell',
   },
   direct_upsell: {
-    bg: '#fdf4ff',
-    border: '#e879f9',
-    label: 'Direct Upsell',
+    accent: '#8b5cf6',
+    labelBg: 'rgba(139, 92, 246, 0.12)',
+    labelColor: '#a78bfa',
+    label: 'Direct',
   },
 };
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
+const ICON_SPARKLE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 2L13.09 8.26L19 9L13.09 9.74L12 16L10.91 9.74L5 9L10.91 8.26L12 2Z"/>
+  <path d="M19 15L19.5 17.5L22 18L19.5 18.5L19 21L18.5 18.5L16 18L18.5 17.5L19 15Z" opacity="0.6"/>
+  <path d="M5 3L5.4 4.6L7 5L5.4 5.4L5 7L4.6 5.4L3 5L4.6 4.6L5 3Z" opacity="0.6"/>
+</svg>`;
+
+const ICON_REGEN = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+</svg>`;
+
+const ICON_CHEVRON_UP = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="18 15 12 9 6 15"/>
+</svg>`;
+
+const ICON_CHEVRON_DOWN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="6 9 12 15 18 9"/>
+</svg>`;
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const STYLES = `
   :host {
     display: block;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 13px;
-    color: #1a1a1a;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
   }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Panel shell ───────────────────────────────────────── */
   #ofc-panel {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 12px;
+    background: #0e0e14;
+    border: 1px solid #21212e;
+    border-radius: 12px;
+    overflow: hidden;
     margin: 8px 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    width: 100%;
     min-width: 260px;
-    max-width: 400px;
+    max-width: 440px;
   }
+
+  /* ── Header ─────────────────────────────────────────────── */
   #ofc-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    padding: 8px 8px 8px 12px;
+    background: #13131d;
+    border-bottom: 1px solid #21212e;
+    gap: 8px;
+    user-select: none;
   }
-  #ofc-header-left {
+
+  #ofc-title {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    min-width: 0;
+    flex: 1;
   }
-  #ofc-header span.dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #22c55e;
-    display: inline-block;
-  }
-  #ofc-regenerate {
-    background: none;
-    border: 1px solid #e5e7eb;
-    border-radius: 5px;
-    padding: 3px 8px;
-    font-size: 11px;
-    color: #6b7280;
-    cursor: pointer;
-    display: none;
-    align-items: center;
-    gap: 4px;
-    transition: background 0.1s, color 0.1s;
-  }
-  #ofc-regenerate:hover {
-    background: #f3f4f6;
-    color: #374151;
-  }
-  #ofc-regenerate.visible {
+
+  .ofc-logo {
+    color: #7c3aed;
+    flex-shrink: 0;
     display: flex;
+    align-items: center;
   }
-  #ofc-regenerate.spinning svg {
-    animation: spin 0.7s linear infinite;
+
+  #ofc-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #5a5a7a;
+    white-space: nowrap;
   }
+
+  #ofc-count {
+    font-size: 10px;
+    font-weight: 400;
+    color: #383850;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  #ofc-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .ofc-hbtn {
+    background: none;
+    border: none;
+    color: #383858;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+    line-height: 0;
+  }
+
+  .ofc-hbtn:hover {
+    color: #7878a8;
+    background: #1c1c2a;
+  }
+
+  #ofc-regen.spinning svg {
+    animation: ofc-spin 0.65s linear infinite;
+  }
+
+  /* ── Body ───────────────────────────────────────────────── */
+  #ofc-body {
+    overflow: hidden;
+  }
+
+  #ofc-panel.collapsed #ofc-body {
+    display: none;
+  }
+
+  /* ── Loading ────────────────────────────────────────────── */
   .ofc-loading {
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: #9ca3af;
-    padding: 8px 0;
+    gap: 10px;
+    padding: 13px 14px;
+    color: #404058;
+    font-size: 12px;
   }
+
   .ofc-spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid #e5e7eb;
-    border-top-color: #6366f1;
+    border: 2px solid #1e1e2c;
+    border-top-color: #7c3aed;
     border-radius: 50%;
-    animation: spin 0.7s linear infinite;
+    animation: ofc-spin 0.7s linear infinite;
     flex-shrink: 0;
   }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+
+  @keyframes ofc-spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ──────────────────────────────────────────────── */
   .ofc-error {
-    color: #ef4444;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    color: #f87171;
     font-size: 12px;
-    padding: 6px 0;
+    line-height: 1.55;
   }
+
+  .ofc-error-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #f87171;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  /* ── Suggestion cards ───────────────────────────────────── */
   .ofc-suggestions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
+
   .ofc-card {
-    border-radius: 7px;
-    padding: 9px 11px;
-    border: 1px solid;
+    display: flex;
+    align-items: stretch;
+    border-top: 1px solid #18181f;
     cursor: pointer;
-    transition: opacity 0.1s, transform 0.1s;
+    transition: background 0.12s;
+    animation: ofc-fadein 0.2s ease both;
     position: relative;
   }
+
+  .ofc-card:first-child {
+    border-top: none;
+  }
+
+  .ofc-card:nth-child(2) { animation-delay: 0.05s; }
+  .ofc-card:nth-child(3) { animation-delay: 0.10s; }
+
+  @keyframes ofc-fadein {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   .ofc-card:hover {
-    opacity: 0.88;
-    transform: translateY(-1px);
+    background: #131320;
   }
-  .ofc-card:active {
-    transform: translateY(0);
+
+  .ofc-accent-bar {
+    width: 3px;
+    flex-shrink: 0;
   }
-  .ofc-card-label {
-    font-size: 10px;
+
+  .ofc-card-body {
+    flex: 1;
+    padding: 9px 12px 10px 11px;
+    min-width: 0;
+  }
+
+  .ofc-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .ofc-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 9px;
     font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #6b7280;
-    margin-bottom: 4px;
+    padding: 2px 7px 2px 6px;
+    border-radius: 100px;
+    flex-shrink: 0;
   }
-  .ofc-card-text {
-    line-height: 1.4;
-    color: #111827;
-  }
-  .ofc-copied {
-    position: absolute;
-    top: 6px;
-    right: 8px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #16a34a;
+
+  .ofc-use-btn {
+    font-size: 11px;
+    font-weight: 500;
+    color: #38385a;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 9px;
+    cursor: pointer;
+    flex-shrink: 0;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition:
+      opacity 0.15s,
+      color 0.15s,
+      background 0.15s,
+      border-color 0.15s;
     pointer-events: none;
+    white-space: nowrap;
+    font-family: inherit;
+    line-height: 1.6;
   }
-  .ofc-copied.visible {
+
+  .ofc-card:hover .ofc-use-btn {
     opacity: 1;
+    pointer-events: auto;
+    color: #6868a8;
+    border-color: #28283c;
+    background: #19192a;
+  }
+
+  .ofc-use-btn:hover {
+    color: #a78bfa;
+    background: rgba(139, 92, 246, 0.14);
+    border-color: rgba(139, 92, 246, 0.28);
+  }
+
+  .ofc-use-btn.done {
+    opacity: 1;
+    pointer-events: none;
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.22);
+  }
+
+  .ofc-text {
+    color: #9898b8;
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .ofc-card:hover .ofc-text {
+    color: #b0b0cc;
   }
 `;
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 /** Escape user/AI text before injecting into innerHTML to prevent XSS. */
 function escapeHtml(text: string): string {
@@ -165,12 +334,15 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// ─── UIOverlay class ──────────────────────────────────────────────────────────
+
 export class UIOverlay {
   private host: HTMLElement | null = null;
   private shadow: ShadowRoot | null = null;
   private panel: HTMLElement | null = null;
   private insertHandler: ((text: string) => void) | null = null;
   private regenerateHandler: (() => void) | null = null;
+  private collapsed = false;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
@@ -183,10 +355,13 @@ export class UIOverlay {
   inject(anchor: Element): void {
     if (this.isAttached()) return;
 
+    // Remove any orphaned panel left by a previous UIOverlay instance.
+    // Without this, SPA re-navigation creates a second panel alongside the stale one.
+    document.getElementById(HOST_ID)?.remove();
+
     const host = document.createElement('div');
     host.id = HOST_ID;
-    // If anchor has a data-ofc-container attr it's a dedicated slot — append inside.
-    // Otherwise insert after the anchor (default: next to the OF chat input).
+
     if (anchor.hasAttribute('data-ofc-container')) {
       anchor.appendChild(host);
     } else {
@@ -202,31 +377,43 @@ export class UIOverlay {
     const panel = document.createElement('div');
     panel.id = 'ofc-panel';
 
+    // ── Header ──────────────────────────────────────────────
     const header = document.createElement('div');
     header.id = 'ofc-header';
     header.innerHTML = `
-      <span id="ofc-header-left"><span class="dot"></span> AI Suggestions</span>
-      <button id="ofc-regenerate" title="Regenerate suggestions">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        Regenerate
-      </button>
+      <div id="ofc-title">
+        <span class="ofc-logo">${ICON_SPARKLE}</span>
+        <span id="ofc-label">AI Suggestions</span>
+        <span id="ofc-count"></span>
+      </div>
+      <div id="ofc-actions">
+        <button id="ofc-regen" class="ofc-hbtn" title="Regenerate suggestions" style="display:none">
+          ${ICON_REGEN}
+        </button>
+        <button id="ofc-collapse" class="ofc-hbtn" title="Collapse panel">
+          ${ICON_CHEVRON_UP}
+        </button>
+      </div>
     `;
+
+    // ── Body ────────────────────────────────────────────────
+    const body = document.createElement('div');
+    body.id = 'ofc-body';
+
     panel.appendChild(header);
-
-    // Wire regenerate button — handler set later via setRegenerateHandler()
-    const regenBtn = header.querySelector<HTMLButtonElement>('#ofc-regenerate')!;
-    regenBtn.addEventListener('click', () => {
-      if (this.regenerateHandler) this.regenerateHandler();
-    });
-
+    panel.appendChild(body);
     shadow.appendChild(panel);
 
     this.host = host;
     this.shadow = shadow;
     this.panel = panel;
+
+    // Wire header buttons
+    const regenBtn = header.querySelector<HTMLButtonElement>('#ofc-regen')!;
+    regenBtn.addEventListener('click', () => this.regenerateHandler?.());
+
+    const collapseBtn = header.querySelector<HTMLButtonElement>('#ofc-collapse')!;
+    collapseBtn.addEventListener('click', () => this.toggleCollapse());
   }
 
   isAttached(): boolean {
@@ -236,7 +423,8 @@ export class UIOverlay {
   showLoading(): void {
     if (!this.panel) return;
     this.setRegenVisible(false);
-    this.setContent(`
+    this.setCount('');
+    this.setBodyContent(`
       <div class="ofc-loading">
         <div class="ofc-spinner"></div>
         <span>Generating suggestions…</span>
@@ -247,52 +435,76 @@ export class UIOverlay {
   showSuggestions(suggestions: Suggestion[]): void {
     if (!this.panel) return;
 
+    const count = suggestions.length;
+    this.setCount(count > 0 ? `${count} suggestion${count === 1 ? '' : 's'}` : '');
+
     const cardsHtml = suggestions
       .map((s) => {
-        const colors = CARD_COLORS[s.type] ?? CARD_COLORS.engage;
+        const cfg = TYPE_CONFIG[s.type] ?? TYPE_CONFIG.engage;
         return `
-          <div
-            class="ofc-card"
-            data-text="${escapeHtml(s.text)}"
-            style="background:${colors.bg};border-color:${colors.border};"
-          >
-            <div class="ofc-card-label">${escapeHtml(colors.label)}</div>
-            <div class="ofc-card-text">${escapeHtml(s.text)}</div>
-            <span class="ofc-copied">Inserted!</span>
+          <div class="ofc-card" data-text="${escapeHtml(s.text)}">
+            <div class="ofc-accent-bar" style="background:${cfg.accent};"></div>
+            <div class="ofc-card-body">
+              <div class="ofc-card-top">
+                <span class="ofc-badge" style="background:${cfg.labelBg};color:${cfg.labelColor};">
+                  ${escapeHtml(cfg.label)}
+                </span>
+                <button class="ofc-use-btn">Use →</button>
+              </div>
+              <div class="ofc-text">${escapeHtml(s.text)}</div>
+            </div>
           </div>
         `;
       })
       .join('');
 
-    this.setContent(`<div class="ofc-suggestions">${cardsHtml}</div>`);
+    this.setBodyContent(`<div class="ofc-suggestions">${cardsHtml}</div>`);
     this.setRegenVisible(true);
 
-    // Attach click-to-insert handlers after rendering
+    // Attach click handlers after rendering
     this.shadow?.querySelectorAll<HTMLElement>('.ofc-card').forEach((card) => {
-      card.addEventListener('click', () => {
+      const useBtn = card.querySelector<HTMLButtonElement>('.ofc-use-btn');
+
+      const doInsert = (): void => {
         const text = card.dataset['text'] ?? '';
-        const showBadge = (): void => {
-          const badge = card.querySelector<HTMLElement>('.ofc-copied');
-          if (!badge) return;
-          badge.classList.add('visible');
-          setTimeout(() => badge.classList.remove('visible'), 1500);
-        };
         if (this.insertHandler) {
           this.insertHandler(text);
-          showBadge();
         } else {
-          void navigator.clipboard.writeText(text).then(showBadge);
+          void navigator.clipboard.writeText(text);
         }
+        if (useBtn) {
+          useBtn.textContent = '✓ Inserted';
+          useBtn.classList.add('done');
+          setTimeout(() => {
+            useBtn.textContent = 'Use →';
+            useBtn.classList.remove('done');
+          }, 2000);
+        }
+      };
+
+      // Card body click → insert (but not if the use button was clicked, it handles itself)
+      card.addEventListener('click', (e) => {
+        if (e.target === useBtn) return; // use-btn handles it
+        doInsert();
+      });
+
+      useBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        doInsert();
       });
     });
   }
 
   showError(msg: string): void {
     if (!this.panel) return;
-    this.setRegenVisible(true); // allow retry on error
-    this.setContent(
-      `<div class="ofc-error">⚠ ${escapeHtml(msg)}</div>`
-    );
+    this.setRegenVisible(true);
+    this.setCount('');
+    this.setBodyContent(`
+      <div class="ofc-error">
+        <div class="ofc-error-dot"></div>
+        <span>${escapeHtml(msg)}</span>
+      </div>
+    `);
   }
 
   remove(): void {
@@ -302,21 +514,34 @@ export class UIOverlay {
     this.panel = null;
   }
 
-  private setRegenVisible(visible: boolean): void {
-    const btn = this.shadow?.querySelector<HTMLElement>('#ofc-regenerate');
-    if (!btn) return;
-    btn.classList.toggle('visible', visible);
+  // ─── Private ──────────────────────────────────────────────
+
+  private toggleCollapse(): void {
+    this.collapsed = !this.collapsed;
+    this.panel?.classList.toggle('collapsed', this.collapsed);
+    const collapseBtn = this.shadow?.querySelector('#ofc-collapse');
+    if (collapseBtn) {
+      collapseBtn.innerHTML = this.collapsed ? ICON_CHEVRON_DOWN : ICON_CHEVRON_UP;
+      collapseBtn.setAttribute('title', this.collapsed ? 'Expand panel' : 'Collapse panel');
+    }
   }
 
-  /** Replace the panel body content (preserves header). */
-  private setContent(html: string): void {
-    if (!this.panel) return;
-    // Remove all children except the header
-    const header = this.panel.querySelector('#ofc-header');
-    this.panel.innerHTML = '';
-    if (header) this.panel.appendChild(header);
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    this.panel.appendChild(container);
+  private setRegenVisible(visible: boolean): void {
+    const btn = this.shadow?.querySelector<HTMLElement>('#ofc-regen');
+    if (!btn) return;
+    btn.style.display = visible ? '' : 'none';
+    btn.classList.toggle('spinning', false);
+  }
+
+  private setCount(text: string): void {
+    const el = this.shadow?.querySelector<HTMLElement>('#ofc-count');
+    if (el) el.textContent = text ? `· ${text}` : '';
+  }
+
+  /** Replace only the body content, leaving the header intact. */
+  private setBodyContent(html: string): void {
+    const body = this.panel?.querySelector<HTMLElement>('#ofc-body');
+    if (!body) return;
+    body.innerHTML = html;
   }
 }
