@@ -1,5 +1,14 @@
 # CLAUDE.md — OF Chatter Assistant Chrome Extension
 
+## For new sessions: read this first
+
+- **`docs/DECISIONS.md`** — full rationale for every architectural decision, DOM strategy,
+  prompt design choices, mock harness design, and sources used. Read before making changes.
+- **`tasks/todo.md`** — implementation progress and backlog.
+- **`COMMITS.md`** — commit message conventions.
+
+---
+
 ## Project Overview
 
 This is a Chrome Extension (Manifest V3) that injects an AI-powered chat assistant into OnlyFans' web interface. It helps agency operators ("chatters") manage fan conversations more efficiently by suggesting contextual replies, tracking fan profiles, and providing upsell nudges.
