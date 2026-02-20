@@ -48,7 +48,7 @@ async function handleMessage(
   request: BackgroundRequest
 ): Promise<BackgroundResponse> {
   if (request.type === 'GET_SUGGESTIONS') {
-    const { conversation, fanProfile, creatorPersona, variationHint } = request;
+    const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages } = request;
 
     const apiKey = await getApiKey();
     const { system, user } = buildSuggestionPrompt({
@@ -56,6 +56,8 @@ async function handleMessage(
       fanProfile,
       creatorPersona,
       variationHint,
+      creatorProfile,
+      creatorRealMessages,
     });
 
     // Use fallback model for long/complex conversations
@@ -68,6 +70,14 @@ async function handleMessage(
     const suggestions = parseSuggestions(rawText);
 
     return { success: true, suggestions };
+  }
+
+  if (request.type === 'ANALYZE_CREATOR_STYLE') {
+    const apiKey = await getApiKey();
+    const system = `You are a writing style analyst. Describe a creator's messaging style in 3-4 sentences covering: emoji usage, sentence length and structure, tone, characteristic words or phrases, and how they open messages. Be specific — this will train an AI to mimic their voice.`;
+    const user = `Analyse these messages:\n${request.creatorMessages.map((m, i) => `${i + 1}. "${m}"`).join('\n')}`;
+    const style = await callAnthropicApi({ apiKey, system, user, model: DEFAULT_MODEL });
+    return { success: true, suggestions: [], writingStyle: style.slice(0, 600) };
   }
 
   // Dead code path — future request types handled here via discriminated union

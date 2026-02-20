@@ -14,7 +14,7 @@
     }
     h1 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: #fff; }
     label { display: block; margin-bottom: 5px; color: #aaa; font-size: 12px; }
-    input {
+    input, select {
       width: 100%;
       padding: 7px 10px;
       background: #222;
@@ -24,7 +24,9 @@
       font-size: 13px;
       outline: none;
     }
-    input:focus { border-color: #555; }
+    input:focus, select:focus { border-color: #555; }
+    select option { background: #222; }
+    .field { margin-top: 12px; }
     button {
       margin-top: 10px;
       width: 100%;
@@ -50,6 +52,18 @@
   <h1>OF Chatter Assistant</h1>
   <label for="apiKey">Anthropic API Key</label>
   <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+  <div class="field">
+    <label for="creatorType">Creator type</label>
+    <select id="creatorType">
+      <option value="woman">Woman</option>
+      <option value="egirl">E-girl</option>
+      <option value="mature_woman">Mature woman</option>
+      <option value="man">Man</option>
+      <option value="picture_only">Picture only</option>
+      <option value="video_creator">Video creator</option>
+      <option value="couple">Couple</option>
+    </select>
+  </div>
   <button id="save">Save</button>
   <div id="status"></div>
 

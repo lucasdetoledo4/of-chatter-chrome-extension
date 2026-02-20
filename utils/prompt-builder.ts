@@ -3,6 +3,7 @@ import type {
   FanProfile,
   CreatorPersona,
   CreatorType,
+  CreatorProfile,
 } from '../types/index';
 
 // ─── Per-type voice guidance ──────────────────────────────────────────────────
@@ -232,6 +233,9 @@ interface PromptInput {
   fanProfile: FanProfile;
   creatorPersona: CreatorPersona;
   variationHint?: string;
+  creatorProfile?: CreatorProfile;
+  /** Creator's own sent messages extracted from conversation history */
+  creatorRealMessages?: string[];
 }
 
 interface BuiltPrompt {
@@ -239,25 +243,51 @@ interface BuiltPrompt {
   user: string;
 }
 
+function buildPersonaSection(
+  creatorPersona: CreatorPersona,
+  creatorProfile?: CreatorProfile,
+  creatorRealMessages?: string[]
+): string {
+  const displayName = creatorProfile?.displayName || creatorPersona.name;
+
+  // Voice description: AI-generated style beats static guide
+  const voiceDesc = creatorProfile?.writingStyle
+    ? `Style: ${creatorProfile.writingStyle}`
+    : VOICE_GUIDE[creatorPersona.type];
+
+  const bioLine = creatorProfile?.bio
+    ? `Their bio: "${creatorProfile.bio}"\n`
+    : '';
+
+  // Few-shot examples: real messages beat static examples
+  const hasRealMessages = creatorRealMessages && creatorRealMessages.length >= 3;
+  const examplesSection = hasRealMessages
+    ? `Real messages they've sent — match this voice exactly:\n${creatorRealMessages
+        .slice(-5)
+        .map((m) => `  - "${m}"`)
+        .join('\n')}`
+    : FEW_SHOT_EXAMPLES[creatorPersona.type];
+
+  return `## Creator: ${displayName}
+${bioLine}${voiceDesc}
+${examplesSection}`;
+}
+
 export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
-  const { conversation, fanProfile, creatorPersona, variationHint } = input;
+  const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages } = input;
 
   const historyText = conversation
     .map((m) => `[${m.role === 'fan' ? 'Fan' : 'You'}]: ${m.text}`)
     .join('\n');
 
-  const voiceGuide = VOICE_GUIDE[creatorPersona.type];
-  const fewShots = FEW_SHOT_EXAMPLES[creatorPersona.type];
+  const personaSection = buildPersonaSection(creatorPersona, creatorProfile, creatorRealMessages);
   const fanContext = buildFanContext(fanProfile);
   const subDuration = calculateSubDuration(fanProfile.firstSeen);
+  const displayName = creatorProfile?.displayName || creatorPersona.name;
 
-  const system = `You are a professional OnlyFans chatter writing AS the creator — the fan must believe they're talking directly to ${creatorPersona.name}.
+  const system = `You are a professional OnlyFans chatter writing AS the creator — the fan must believe they're talking directly to ${displayName}.
 
-## Your creator identity
-Name: ${creatorPersona.name}
-Type: ${creatorPersona.type}
-${voiceGuide}
-${fewShots}
+${personaSection}
 
 ## Fan profile
 Name: ${fanProfile.displayName} | Subscribed: ${subDuration} | Total spent: $${fanProfile.lifetimeValue.toFixed(2)} | Last seen: ${formatLastSeen(fanProfile.lastSeen)}
@@ -289,7 +319,7 @@ Output format:
   const user = `Conversation (${conversation.length} messages):
 ${historyText}
 
-Reply as ${creatorPersona.name} now.${variationLine}`;
+Reply as ${displayName} now.${variationLine}`;
 
   return { system, user };
 }
