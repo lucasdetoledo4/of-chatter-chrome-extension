@@ -152,6 +152,16 @@
       outline: none;
     }
     .field input:focus { border-color: #6366f1; }
+    .field select {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      outline: none;
+      background: #fff;
+    }
+    .field select:focus { border-color: #6366f1; }
     #key-status {
       font-size: 11px;
       margin-top: 4px;
@@ -278,6 +288,18 @@
         />
         <div id="key-status">Not set</div>
       </div>
+      <div class="field">
+        <label for="persona-select">Creator Persona</label>
+        <select id="persona-select">
+          <option value="woman">Woman (standard)</option>
+          <option value="egirl">Egirl</option>
+          <option value="mature_woman">Mature woman</option>
+          <option value="man">Man</option>
+          <option value="picture_only">Picture-only creator</option>
+          <option value="video_creator">Video creator</option>
+          <option value="couple">Couple</option>
+        </select>
+      </div>
     </div>
 
     <div class="sim-section">
@@ -345,24 +367,50 @@
 
           const fp = request.fanProfile;
           const cp = request.creatorPersona;
+          const variationHint = request.variationHint || '';
 
-          const systemPrompt = `You are an expert OnlyFans chatter managing conversations on behalf of a creator.
-Your goal is to maximize fan engagement and revenue while maintaining an authentic,
-warm tone that matches the creator's persona.
+          const VOICE_GUIDE = {
+            egirl: "Young, bubbly, playful, teasing. Heavy emoji use. Casual spellings (omg, ngl, lmao). FOMO-driven. Flirt by being just out of reach.",
+            woman: "Confident, warm, genuinely flirty. Real person energy. Mix playful and sensual. Build connection before the sell.",
+            mature_woman: "Experienced, self-assured, nurturing-but-seductive. Fewer emojis, more weight in your words. Make fans feel chosen.",
+            man: "Masculine, direct, gym/lifestyle. Low emoji use. Confident, not thirsty. Upsells are matter-of-fact.",
+            picture_only: "Visual and descriptive. Live in the language of sets, angles, and frozen moments. Tease through description.",
+            video_creator: "Motion-forward. Talk about video like it's live. Custom clips are your premium tier. Emphasise what photos can't give.",
+            couple: '"We" is natural. Voyeuristic appeal. Both of you feel present. Frame upsells as joining rather than buying.',
+          };
 
-Creator persona: ${cp.name} — ${cp.description}
-Fan profile: Name: ${fp.displayName} | Total spent: $${fp.lifetimeValue.toFixed(2)}
+          const voiceGuide = VOICE_GUIDE[cp.type] || VOICE_GUIDE.woman;
 
-Generate exactly 3 reply options as JSON:
+          const systemPrompt = `You are a professional OnlyFans chatter writing AS the creator — the fan must believe they're talking directly to ${cp.name}.
+
+## Your creator identity
+Name: ${cp.name}
+Type: ${cp.type}
+${voiceGuide}
+
+## Fan profile
+Name: ${fp.displayName} | Total spent: $${fp.lifetimeValue.toFixed(2)}
+
+## Suggestion tiers
+Generate exactly 3 replies with clearly different approaches:
+1. engage — build rapport, no sell at all.
+2. soft_upsell — natural, story-led nudge toward content.
+3. direct_upsell — clear CTA, confident, benefit-led.
+
+## Rules
+- Each reply must differ in structure, length, and opening word.
+- Stay fully in character. No corporate language.
+- Respond ONLY with the JSON array. No preamble, no markdown fences.
+
+Output format:
 [
   { "type": "engage", "text": "..." },
   { "type": "soft_upsell", "text": "..." },
   { "type": "direct_upsell", "text": "..." }
-]
+]`;
 
-Respond ONLY with the JSON array. No preamble, no explanation, no markdown fences.`;
-
-          const userPrompt = `Conversation history:\n${historyText}\n\nGenerate 3 reply suggestions now.`;
+          const variationLine = variationHint ? `\n\nIMPORTANT: ${variationHint} Make these feel completely different.` : '';
+          const userPrompt = `Conversation (${history.length} messages):\n${historyText}\n\nReply as ${cp.name} now.${variationLine}`;
 
           try {
             console.log('[OFC Mock] Calling Anthropic API…');
@@ -462,6 +510,7 @@ Respond ONLY with the JSON array. No preamble, no explanation, no markdown fence
   // ── Mock flags — set BEFORE injector.js loads ─────────────
   window.__OFC_MOCK__ = true;
   window.__OFC_MOCK_FAN_ID__ = '1234567';
+  window.__OFC_MOCK_PERSONA__ = 'woman'; // default; updated by persona selector below
   // Redirect the suggestion panel into the right pane instead of below the chat input
   window.__OFC_MOCK_ANCHOR_ID__ = 'ai-panel-container';
 
@@ -504,6 +553,12 @@ Respond ONLY with the JSON array. No preamble, no explanation, no markdown fence
   } catch (e) {
     console.warn('[OFC Mock] replaceState blocked (file:// origin) — using window flag instead.');
   }
+
+  // ── Persona selector ──────────────────────────────────────
+  const personaSelect = document.getElementById('persona-select');
+  personaSelect.addEventListener('change', () => {
+    window.__OFC_MOCK_PERSONA__ = personaSelect.value;
+  });
 
   // ── Fan message simulation ────────────────────────────────
   const fanMessages = [

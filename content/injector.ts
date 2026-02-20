@@ -8,6 +8,7 @@ import type {
 import { observeChat, scrapeConversationHistory } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
 import { upsertFanProfile, getFanProfile } from '../utils/storage';
+import { CREATOR_PRESETS, pickVariationHint } from '../utils/prompt-builder';
 
 console.log('[OFC] Content script loaded.');
 
@@ -27,12 +28,14 @@ const w = window as typeof window & {
   __OFC_MOCK_ANCHOR_ID__?: string;
 };
 
-// Default persona used until popup settings are implemented
-const DEFAULT_PERSONA: CreatorPersona = {
-  name: 'Creator',
-  description:
-    'Friendly, playful, and authentic. Loves connecting with fans and creating exclusive content.',
-};
+// Default persona — reads mock flag if set, otherwise falls back to 'woman' preset
+function getActivePersona(): CreatorPersona {
+  const mockType = (window as typeof window & { __OFC_MOCK_PERSONA__?: string }).__OFC_MOCK_PERSONA__;
+  if (mockType && mockType in CREATOR_PRESETS) {
+    return CREATOR_PRESETS[mockType as keyof typeof CREATOR_PRESETS];
+  }
+  return CREATOR_PRESETS.woman;
+}
 
 // ─── URL Helpers ──────────────────────────────────────────────────────────────
 
@@ -183,7 +186,7 @@ async function handleNewMessage(
     type: 'GET_SUGGESTIONS',
     conversation,
     fanProfile,
-    creatorPersona: DEFAULT_PERSONA,
+    creatorPersona: getActivePersona(),
   };
 
   // Expose the request so regenerate can replay it
@@ -218,7 +221,12 @@ async function initializeChatAssistant(): Promise<void> {
   // Last request is stored so regenerate can replay it
   let lastRequest: GetSuggestionsRequest | null = null;
   overlay.setRegenerateHandler(() => {
-    if (lastRequest) void fireSuggestionsRequest(lastRequest, overlay);
+    if (lastRequest) {
+      void fireSuggestionsRequest(
+        { ...lastRequest, variationHint: pickVariationHint() },
+        overlay
+      );
+    }
   });
 
   let stopObserver: (() => void) | null = null;
