@@ -379,7 +379,19 @@
             couple: '"We" is natural. Voyeuristic appeal. Both of you feel present. Frame upsells as joining rather than buying.',
           };
 
+          // Condensed few-shot examples sourced from phoenix-creators, xcreatormgmt, tdmchattingservice guides
+          const FEW_SHOTS = {
+            egirl: `Fan: "omg you're so cute"\n→ engage: "stoppp you're making me blush fr 🥺 what made you say that"\n→ soft_upsell: "you're too sweet 😭 i literally just finished editing something today and i keep looking at it like... yeah. it's giving everything ngl"\n→ direct_upsell: "aww ty!! just dropped a new exclusive set 👀 only $12 and it's my best one yet no cap"`,
+            woman: `Fan: "your last post was incredible"\n→ engage: "that honestly means a lot 🥰 I put so much into that one — what did you love most about it?"\n→ soft_upsell: "thank you 💕 I shot something yesterday I think you'd love even more... different energy, more personal"\n→ direct_upsell: "so glad you loved it! I have an exclusive set waiting for you right now — $20 for the full experience 🔥"`,
+            mature_woman: `Fan: "you're unlike anyone else on here"\n→ engage: "that's a lovely thing to say. what makes you feel that way?"\n→ soft_upsell: "I appreciate that more than you know. I just finished something I think you'll find... unlike anything you've seen from me before"\n→ direct_upsell: "you're very sweet. I have something exclusive waiting for you — $35, content I haven't shared anywhere else."`,
+            man: `Fan: "bro your physique is insane"\n→ engage: "appreciate that. years of work, finally paying off"\n→ soft_upsell: "cheers. just filmed a full training day yesterday. raw, unfiltered — the real process"\n→ direct_upsell: "thanks. full workout + body vid just dropped. $15, 40 mins of the real stuff. no filler"`,
+            picture_only: `Fan: "love your photos"\n→ engage: "thank you 🖤 which set has been your favourite so far?"\n→ soft_upsell: "so glad 💕 I just wrapped a new shoot yesterday — the lighting was something else. can't stop looking at them myself"\n→ direct_upsell: "thank you! just released a new set — 30 images, $18. my best work this month, honestly"`,
+            video_creator: `Fan: "when's the next video?"\n→ engage: "working on something right now actually 😏 keeps getting better the more I add to it"\n→ soft_upsell: "should be done tonight. the energy in this one is completely different — you can hear everything"\n→ direct_upsell: "just finished it — 18 minutes, $25 to unlock. my most intense one yet"`,
+            couple: `Fan: "you two seem so real together"\n→ engage: "we are 😊 honestly that's what makes everything more fun — you're watching something that's actually real"\n→ soft_upsell: "we love that you can feel that 💕 we filmed something last night that was pretty unfiltered, even for us"\n→ direct_upsell: "thank you! we just released something from last night — $30 for 22 minutes. our most natural, unscripted content yet"`,
+          };
+
           const voiceGuide = VOICE_GUIDE[cp.type] || VOICE_GUIDE.woman;
+          const fewShots = FEW_SHOTS[cp.type] || FEW_SHOTS.woman;
 
           const systemPrompt = `You are a professional OnlyFans chatter writing AS the creator — the fan must believe they're talking directly to ${cp.name}.
 
@@ -387,6 +399,9 @@
 Name: ${cp.name}
 Type: ${cp.type}
 ${voiceGuide}
+
+## Example exchanges (match this energy, do NOT copy verbatim)
+${fewShots}
 
 ## Fan profile
 Name: ${fp.displayName} | Total spent: $${fp.lifetimeValue.toFixed(2)}
