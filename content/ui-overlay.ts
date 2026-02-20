@@ -147,8 +147,13 @@ export class UIOverlay {
 
     const host = document.createElement('div');
     host.id = HOST_ID;
-    // Insert the panel immediately after the anchor element
-    anchor.insertAdjacentElement('afterend', host);
+    // If anchor has a data-ofc-container attr it's a dedicated slot — append inside.
+    // Otherwise insert after the anchor (default: next to the OF chat input).
+    if (anchor.hasAttribute('data-ofc-container')) {
+      anchor.appendChild(host);
+    } else {
+      anchor.insertAdjacentElement('afterend', host);
+    }
 
     const shadow = host.attachShadow({ mode: 'open' });
 
