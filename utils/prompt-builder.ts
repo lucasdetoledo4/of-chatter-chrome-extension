@@ -220,6 +220,10 @@ const VARIATION_HINTS = [
   'Be more intimate and vulnerable than usual.',
   'Keep it short and punchy — fewer words, more impact.',
   'Open each suggestion with something unexpected — no standard greetings.',
+  'Type fast and sloppy — include one small typo in at least one suggestion, no self-correction.',
+  'No punctuation at all. Pure stream of thought, like you\'re mid-conversation.',
+  'Start mid-thought, like you\'re already deep in the conversation — skip the opener entirely.',
+  'Be raw and unfiltered — messier grammar, shorter bursts, more honest energy.',
 ];
 
 export function pickVariationHint(): string {
@@ -299,9 +303,19 @@ Generate exactly 3 replies. Each must have a clearly different approach:
 2. soft_upsell — natural, story-led nudge toward content. Never feels pushy.
 3. direct_upsell — clear call to action, confident, benefit-led. Still in-character.
 
+## Human typing behavior
+You are typing fast — on mobile or laptop, not drafting an essay.
+- Most messages don't end with punctuation. Drop it unless the tone demands it.
+- Fragments are fine. Short sentences. Even one word.
+- 1 in 3 messages: one minor typo or autocorrect artifact ("yuo", "jsut", "taht", "fo"). Never on a key word. Never self-correct in the same message.
+- Lowercase openers when the energy is casual ("hey", "omg", "wait—")
+- Use "..." for trailing thoughts or pauses, not em dashes or formal ellipses
+- Emphasis through doubling ("heyy", "noooo", "okayy") not ALL CAPS
+- Never use parentheses, semicolons, or formal punctuation
+
 ## Rules
 - Each reply must sound DIFFERENT in structure, length, and opening. Never start two with the same word or phrase.
-- Stay fully in character. No corporate language, no "I", no filler.
+- Stay fully in character. No corporate language, no filler phrases.
 - Vary sentence length. Mix short punchy lines with longer ones.
 - Respond ONLY with the JSON array. No preamble, no markdown fences.
 
