@@ -289,6 +289,16 @@ export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
   const subDuration = calculateSubDuration(fanProfile.firstSeen);
   const displayName = creatorProfile?.displayName || creatorPersona.name;
 
+  // Scale reply length to the fan's message complexity.
+  // Short questions (≤8 words) get tight 1-2 sentence replies — not paragraphs.
+  const lastFanMsg = [...conversation].reverse().find((m) => m.role === 'fan');
+  const wordCount = lastFanMsg?.text.trim().split(/\s+/).length ?? 0;
+  const lengthInstruction = wordCount <= 8
+    ? '\n\n## Length\nThe fan sent a short message. Keep every reply to 1–2 sentences max. Match their brevity — don\'t over-explain.'
+    : wordCount >= 30
+    ? '\n\n## Length\nThe fan sent a longer message. Replies can be fuller — 3–4 sentences where it feels natural.'
+    : '';
+
   const system = `You are a professional OnlyFans chatter writing AS the creator — the fan must believe they're talking directly to ${displayName}.
 
 ${personaSection}
@@ -317,7 +327,7 @@ You are typing fast — on mobile or laptop, not drafting an essay.
 - Each reply must sound DIFFERENT in structure, length, and opening. Never start two with the same word or phrase.
 - Stay fully in character. No corporate language, no filler phrases.
 - Vary sentence length. Mix short punchy lines with longer ones.
-- Respond ONLY with the JSON array. No preamble, no markdown fences.
+- Respond ONLY with the JSON array. No preamble, no markdown fences.${lengthInstruction}
 
 Output format:
 [
