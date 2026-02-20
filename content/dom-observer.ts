@@ -4,12 +4,13 @@ import type { ConversationMessage } from '../types/index';
  * Find the container that holds chat messages.
  *
  * Validated against real OF DOM (2025-02):
- * - Primary: `.b-chat__messages` — the scrollable messages div
- * - Fallback: `.b-chat__messages-wrapper` — inner wrapper
+ * - Primary:  .b-chat__messages      — outer scrollable div
+ * - Secondary: .b-chat__messages-wrapper — inner wrapper (fallback)
+ * - Tertiary: [data-testid="chat-messages"] — mock harness
  *
- * OF uses Vue.js (not React). Class names follow a BEM-like pattern
- * (`b-` for blocks, `m-` for modifiers) and are stable across deploys.
- * `data-testid` and `[role="main"]` are NOT present in real OF DOM.
+ * OF uses Vue.js. Class names follow BEM (.b- blocks, .m- modifiers)
+ * and are stable across deploys. data-testid and [role="main"] are
+ * NOT present in real OF DOM.
  */
 export function findChatContainer(): Element | null {
   const byClass = document.querySelector('.b-chat__messages');
@@ -18,21 +19,24 @@ export function findChatContainer(): Element | null {
   const byWrapper = document.querySelector('.b-chat__messages-wrapper');
   if (byWrapper) return byWrapper;
 
+  // Mock harness fallback
+  const byTestId = document.querySelector('[data-testid="chat-messages"]');
+  if (byTestId) return byTestId;
+
   return null;
 }
 
 /**
- * Determine if a `.b-chat__item-message` element is a fan (incoming) message.
+ * Determine if a message element is from the fan (incoming).
  *
- * OF does not add a class or data attribute to distinguish fan vs creator
- * messages — validated against real DOM (2025-02). Direction is purely CSS.
+ * Validated against real OF DOM (2025-02):
+ * Fan messages contain a .g-avatar element (the fan's profile picture).
+ * Creator messages do NOT contain .g-avatar.
  *
- * Strategy: fan messages are left-aligned, creator messages are right-aligned.
- * We check whether the horizontal midpoint of the element sits in the left
- * or right half of the viewport. Falls back to mock harness signals first.
+ * Mock harness uses data-from-fan="true" or class="from-fan" — checked first.
  */
 function isFanMessage(el: Element): boolean {
-  // Mock harness: explicit attribute takes priority
+  // Mock harness signals take priority
   if (
     el.getAttribute('data-from-fan') === 'true' ||
     el.classList.contains('from-fan')
@@ -40,43 +44,51 @@ function isFanMessage(el: Element): boolean {
     return true;
   }
 
-  const rect = el.getBoundingClientRect();
-  if (rect.width === 0) return false; // not yet rendered
-
-  const messageMid = rect.left + rect.width / 2;
-  return messageMid < window.innerWidth / 2;
+  // Real OF: fan (incoming) messages have an avatar, creator (outgoing) do not
+  return !!el.querySelector('.g-avatar');
 }
 
 /**
  * Extract a ConversationMessage from a DOM node.
  *
  * Real OF structure (validated 2025-02):
- *   div.b-chat__item-message
- *     div.b-chat__message[.m-text][.m-has-media]...
- *       div.b-chat__message__content
- *         div.b-chat__message__body
+ *   [at-attr="chat_message"] div.b-chat__message
+ *     div.b-chat__message__content
+ *       a.g-avatar          ← present only on fan messages
+ *       div.b-chat__message__body
+ *         [at-attr="message_text"] div.b-chat__message__text-wrapper
  *           div.b-chat__message__text   ← text lives here
  *
- * The added node may be the item wrapper itself or a deeper child,
- * so we walk up to find the nearest .b-chat__item-message ancestor.
+ * The added node from MutationObserver may be the message itself, a
+ * b-chat__item-message wrapper (first in a group), or a deeper child,
+ * so we resolve the nearest [at-attr="chat_message"] element.
  */
 export function extractMessageFromNode(node: Node): ConversationMessage | null {
   if (!(node instanceof Element)) return null;
 
-  // Find the message item — could be the node itself or an ancestor
-  const item: Element | null = node.classList.contains('b-chat__item-message')
-    ? node
-    : node.closest('.b-chat__item-message');
+  // Mock harness: simple div with from-fan class added directly
+  if (
+    node.getAttribute('data-from-fan') === 'true' ||
+    node.classList.contains('from-fan')
+  ) {
+    const text = (node.textContent ?? '').trim();
+    if (!text) return null;
+    return { role: 'fan', text };
+  }
 
-  if (!item) return null;
+  // Real OF: resolve the message element from whatever node was added
+  const messageEl: Element | null =
+    node.getAttribute('at-attr') === 'chat_message'
+      ? node
+      : node.querySelector('[at-attr="chat_message"]') ??
+        node.closest('[at-attr="chat_message"]');
 
-  // Skip system/timeline messages (e.g. date separators)
-  if (item.querySelector('.b-chat__message__system')) return null;
+  if (!messageEl) return null;
 
-  if (!isFanMessage(item)) return null;
+  if (!isFanMessage(messageEl)) return null;
 
-  const textEl = item.querySelector('.b-chat__message__text');
-  const text = (textEl?.textContent ?? item.textContent ?? '').trim();
+  const textEl = messageEl.querySelector('.b-chat__message__text');
+  const text = (textEl?.textContent ?? messageEl.textContent ?? '').trim();
   if (!text) return null;
 
   return { role: 'fan', text };
@@ -118,25 +130,31 @@ export function observeChat(
  * Scrape the visible conversation history.
  *
  * Real OF selectors (validated 2025-02):
- * - Message items: `.b-chat__item-message`
- * - Text content:  `.b-chat__message__text`
- * - Direction:     position-based (left = fan, right = creator)
+ * - Messages:   [at-attr="chat_message"] (.b-chat__message elements)
+ * - Text:       .b-chat__message__text
+ * - Fan signal: presence of .g-avatar inside the message
+ *
+ * Mock harness: falls back to [data-from-fan] / .from-fan signals
+ * on elements found via [class*="message"].
  */
 export function scrapeConversationHistory(): ConversationMessage[] {
   const container = findChatContainer();
   if (!container) return [];
 
-  const items = Array.from(container.querySelectorAll('.b-chat__item-message'));
+  // Real OF uses at-attr="chat_message"; mock uses class="message from-fan"
+  const messages = Array.from(
+    container.querySelectorAll('[at-attr="chat_message"], [data-from-fan], .from-fan')
+  );
 
-  return items.reduce<ConversationMessage[]>((acc, item) => {
-    // Skip system/timeline entries
-    if (item.querySelector('.b-chat__message__system')) return acc;
+  // Deduplicate (selectors may overlap)
+  const unique = [...new Set(messages)];
 
-    const textEl = item.querySelector('.b-chat__message__text');
-    const text = (textEl?.textContent ?? item.textContent ?? '').trim();
+  return unique.reduce<ConversationMessage[]>((acc, el) => {
+    const textEl = el.querySelector('.b-chat__message__text');
+    const text = (textEl?.textContent ?? el.textContent ?? '').trim();
     if (!text) return acc;
 
-    const isFan = isFanMessage(item);
+    const isFan = isFanMessage(el);
     acc.push({ role: isFan ? 'fan' : 'creator', text });
     return acc;
   }, []);
