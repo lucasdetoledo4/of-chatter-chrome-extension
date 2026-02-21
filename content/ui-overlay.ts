@@ -32,6 +32,21 @@ const TYPE_CONFIG: Record<SuggestionType, TypeConfig> = {
   },
 };
 
+// Position-based badge config for non-sell modes — type field is unreliable
+// (model outputs "engage" for all 3), so we label by intent instead.
+const MODE_TIER_CONFIG: Partial<Record<SuggestionMode, TypeConfig[]>> = {
+  warm_up: [
+    { accent: '#10b981', labelBg: 'rgba(16, 185, 129, 0.12)', labelColor: '#34d399', label: 'Personal' },
+    { accent: '#10b981', labelBg: 'rgba(16, 185, 129, 0.12)', labelColor: '#34d399', label: 'Warmth'   },
+    { accent: '#10b981', labelBg: 'rgba(16, 185, 129, 0.12)', labelColor: '#34d399', label: 'Light'    },
+  ],
+  re_engage: [
+    { accent: '#8b5cf6', labelBg: 'rgba(139, 92, 246, 0.12)', labelColor: '#a78bfa', label: 'Check-in' },
+    { accent: '#8b5cf6', labelBg: 'rgba(139, 92, 246, 0.12)', labelColor: '#a78bfa', label: 'Remind'   },
+    { accent: '#8b5cf6', labelBg: 'rgba(139, 92, 246, 0.12)', labelColor: '#a78bfa', label: 'Nudge'    },
+  ],
+};
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 const ICON_SPARKLE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -561,9 +576,9 @@ export class UIOverlay {
         <span id="ofc-count"></span>
       </div>
       <div id="ofc-modes">
-        <button class="ofc-mode-btn" data-mode="warm_up">Warm</button>
-        <button class="ofc-mode-btn active" data-mode="sell">Sell</button>
-        <button class="ofc-mode-btn" data-mode="re_engage">Re-engage</button>
+        <button class="ofc-mode-btn${this.activeMode === 'warm_up' ? ' active' : ''}" data-mode="warm_up">Warm</button>
+        <button class="ofc-mode-btn${this.activeMode === 'sell' ? ' active' : ''}" data-mode="sell">Sell</button>
+        <button class="ofc-mode-btn${this.activeMode === 're_engage' ? ' active' : ''}" data-mode="re_engage">Re-engage</button>
       </div>
       <div id="ofc-actions">
         <button id="ofc-regen" class="ofc-hbtn" title="Regenerate suggestions" style="display:none">
@@ -656,9 +671,10 @@ export class UIOverlay {
     const count = suggestions.length;
     this.setCount(count > 0 ? `${count} suggestion${count === 1 ? '' : 's'}` : '');
 
+    const modeTiers = MODE_TIER_CONFIG[this.activeMode];
     const cardsHtml = suggestions
-      .map((s) => {
-        const cfg = TYPE_CONFIG[s.type] ?? TYPE_CONFIG.engage;
+      .map((s, i) => {
+        const cfg = modeTiers?.[i] ?? TYPE_CONFIG[s.type] ?? TYPE_CONFIG.engage;
         return `
           <div class="ofc-card" data-text="${escapeHtml(s.text)}">
             <div class="ofc-accent-bar" style="background:${cfg.accent};"></div>
