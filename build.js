@@ -30,15 +30,29 @@ const contentScriptBuild = {
   globalName: undefined,
 };
 
+// Standalone bundle for the mock harness — lets mock-chat.html call the real
+// buildSuggestionPrompt instead of maintaining a duplicated inline version.
+const mockPromptBuilderBuild = {
+  ...baseOptions,
+  entryPoints: ['utils/prompt-builder.ts'],
+  outfile: 'dist/mock/prompt-builder.js',
+  format: 'iife',
+  globalName: 'OFCPromptBuilder',
+  platform: 'browser',
+  target: 'es2020',
+};
+
 if (isWatch) {
   const swCtx = await esbuild.context(serviceWorkerBuild);
   const csCtx = await esbuild.context(contentScriptBuild);
-  await Promise.all([swCtx.watch(), csCtx.watch()]);
+  const pbCtx = await esbuild.context(mockPromptBuilderBuild);
+  await Promise.all([swCtx.watch(), csCtx.watch(), pbCtx.watch()]);
   console.log('Watching for changes...');
 } else {
   await Promise.all([
     esbuild.build(serviceWorkerBuild),
     esbuild.build(contentScriptBuild),
+    esbuild.build(mockPromptBuilderBuild),
   ]);
   console.log('Build complete.');
 }
