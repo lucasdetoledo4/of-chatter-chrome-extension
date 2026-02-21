@@ -325,6 +325,7 @@ async function initializeChatAssistant(): Promise<void> {
   _activeStopObserver?.();
   _activeStopObserver = null;
   activeSuggestionMode = 'sell';
+  _suggestionGeneration = 0; // prevent stale gen values across re-navigations
 
   const fanId = extractFanIdFromUrl(location.pathname);
   if (!fanId) return;
