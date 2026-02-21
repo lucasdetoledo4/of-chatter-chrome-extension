@@ -250,6 +250,9 @@ async function handleNewMessage(
     console.log(`[OFC] Fan name scraped: "${scrapedName}"`);
   }
 
+  // Show fan context strip immediately — persists through loading/suggestions/error
+  overlay.showFanContext(fanProfile);
+
   // Build conversation context (scraped history + new message appended)
   const history = scrapeConversationHistory();
   // Avoid duplicating the triggering message if it was already scraped
