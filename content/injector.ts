@@ -164,45 +164,50 @@ function insertIntoChat(text: string): void {
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
 
 /**
- * Find the best anchor element to inject the suggestion panel after.
+ * Find the best anchor element for panel injection.
+ *
+ * Returns { el, pos } where pos is the InsertPosition to use relative to el.
+ * For real OF, the panel is injected BEFORE the chat footer (beforebegin) so it
+ * sits between the message thread and the typing area — always in the viewport,
+ * adjacent to where the chatter types. "afterend" of the footer risks placing
+ * the panel below a sticky footer (off-screen) or to the right in flex-row parents.
  *
  * Priority:
- * 1. Mock harness anchor — designated right-pane container
+ * 1. Mock harness anchor — designated right-pane container (uses appendChild)
  * 2. .b-page-content.m-chat-footer — real OF chat footer (validated 2025-02)
  * 3. .b-chat__btn-submit — send button parent as structural fallback
  * 4. [data-testid="chat-input"] — legacy guess, kept as fallback
  * 5. [role="textbox"] closest form — semantic fallback
- * 6. document.body — last resort
+ * 6. document.body — last resort (afterend)
  */
-function findAnchorElement(): Element {
-  // Mock harness: inject into the designated right-pane container
+function findAnchorElement(): { el: Element; pos: InsertPosition } {
+  // Mock harness: inject into the designated right-pane container (appendChild path)
   if (w.__OFC_MOCK_ANCHOR_ID__) {
     const mockAnchor = document.getElementById(w.__OFC_MOCK_ANCHOR_ID__);
-    if (mockAnchor) return mockAnchor;
+    if (mockAnchor) return { el: mockAnchor, pos: 'afterend' }; // pos unused — uses appendChild
   }
 
-  // Real OF footer bar (validated against live DOM 2025-02)
+  // Real OF: insert BEFORE the chat footer so panel sits above the input bar
   const chatFooter = document.querySelector('.b-page-content.m-chat-footer');
-  if (chatFooter) return chatFooter;
+  if (chatFooter) return { el: chatFooter, pos: 'beforebegin' };
 
-  // Fallback: parent of send button
   const sendBtn = document.querySelector('.b-chat__btn-submit');
-  if (sendBtn?.parentElement) return sendBtn.parentElement;
+  if (sendBtn?.parentElement) return { el: sendBtn.parentElement, pos: 'beforebegin' };
 
   const byTestId = document.querySelector('[data-testid="chat-input"]');
-  if (byTestId) return byTestId;
+  if (byTestId) return { el: byTestId, pos: 'beforebegin' };
 
   const textbox = document.querySelector('[role="textbox"]');
   if (textbox) {
     const form = textbox.closest('form');
-    if (form) return form;
-    return textbox;
+    if (form) return { el: form, pos: 'beforebegin' };
+    return { el: textbox, pos: 'beforebegin' };
   }
 
   const firstForm = document.querySelector('form');
-  if (firstForm) return firstForm;
+  if (firstForm) return { el: firstForm, pos: 'beforebegin' };
 
-  return document.body;
+  return { el: document.body, pos: 'afterend' };
 }
 
 // ─── Suggestion Flow ──────────────────────────────────────────────────────────
@@ -354,8 +359,8 @@ async function initializeChatAssistant(): Promise<void> {
   const tryInject = (): void => {
     if (overlay.isAttached()) return;
 
-    const anchor = findAnchorElement();
-    overlay.inject(anchor);
+    const { el: anchor, pos } = findAnchorElement();
+    overlay.inject(anchor, pos);
 
     if (overlay.isAttached()) {
       console.log('[OFC] Chat assistant initialized.');

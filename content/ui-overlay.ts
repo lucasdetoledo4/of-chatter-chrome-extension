@@ -387,6 +387,8 @@ const STYLES = `
     padding: 5px 8px;
     resize: none;
     outline: none;
+    overflow-y: hidden;
+    min-height: 44px;
     transition: border-color 0.15s, color 0.15s;
   }
 
@@ -473,7 +475,7 @@ export class UIOverlay {
     this.notesSaveHandler = fn;
   }
 
-  inject(anchor: Element): void {
+  inject(anchor: Element, insertPosition: InsertPosition = 'beforebegin'): void {
     if (this.isAttached()) return;
 
     // Remove any orphaned panel left by a previous UIOverlay instance.
@@ -484,9 +486,10 @@ export class UIOverlay {
     host.id = HOST_ID;
 
     if (anchor.hasAttribute('data-ofc-container')) {
+      // Mock harness: inject inside the designated container
       anchor.appendChild(host);
     } else {
-      anchor.insertAdjacentElement('afterend', host);
+      anchor.insertAdjacentElement(insertPosition, host);
     }
 
     const shadow = host.attachShadow({ mode: 'open' });
@@ -528,7 +531,7 @@ export class UIOverlay {
     notesSection.id = 'ofc-notes';
     notesSection.innerHTML = `
       <label class="ofc-notes-label">Notes</label>
-      <textarea class="ofc-notes-ta" placeholder="Fan notes…" rows="2" spellcheck="false"></textarea>
+      <textarea class="ofc-notes-ta" placeholder="Fan notes…" spellcheck="false"></textarea>
       <span class="ofc-notes-saved">Saved</span>
     `;
 
@@ -542,8 +545,9 @@ export class UIOverlay {
     this.shadow = shadow;
     this.panel = panel;
 
-    // Wire notes textarea blur → auto-save
+    // Wire notes textarea: auto-grow on input, auto-save on blur
     const notesTa = notesSection.querySelector<HTMLTextAreaElement>('.ofc-notes-ta')!;
+    notesTa.addEventListener('input', () => this.resizeNotesTa());
     notesTa.addEventListener('blur', () => {
       const val = notesTa.value;
       if (val === this.lastSavedNotes) return;
@@ -672,11 +676,12 @@ export class UIOverlay {
     `;
     ctx.style.display = 'flex';
 
-    // Populate notes textarea with stored notes
+    // Populate notes textarea with stored notes and resize to fit
     const notesTa = this.shadow?.querySelector<HTMLTextAreaElement>('.ofc-notes-ta');
     if (notesTa) {
       notesTa.value = fan.notes ?? '';
       this.lastSavedNotes = fan.notes ?? '';
+      this.resizeNotesTa();
     }
   }
 
@@ -704,6 +709,13 @@ export class UIOverlay {
     if (!btn) return;
     btn.style.display = visible ? '' : 'none';
     btn.classList.toggle('spinning', false);
+  }
+
+  private resizeNotesTa(): void {
+    const ta = this.shadow?.querySelector<HTMLTextAreaElement>('.ofc-notes-ta');
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
   }
 
   private setCount(text: string): void {
