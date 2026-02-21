@@ -266,11 +266,11 @@ async function handleNewMessage(
   const conversation: ConversationMessage[] =
     lastScraped?.text === msg.text ? history : [...history, msg];
 
-  // Extract creator's own sent messages for persona grounding
+  // Extract creator's own sent messages for persona grounding.
+  // prompt-builder slices to the last 5 internally; no pre-slice here.
   const creatorRealMessages = conversation
     .filter((m) => m.role === 'creator')
-    .map((m) => m.text)
-    .slice(-10);
+    .map((m) => m.text);
 
   // Kick off style analysis in background if we have enough messages
   triggerStyleAnalysisIfNeeded(creatorRealMessages);
