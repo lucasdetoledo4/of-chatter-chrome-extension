@@ -1,4 +1,4 @@
-import type { Suggestion, SuggestionType, FanProfile } from '../types/index';
+import type { Suggestion, SuggestionType, SuggestionMode, FanProfile } from '../types/index';
 
 const HOST_ID = 'ofc-suggestion-host';
 
@@ -151,6 +151,50 @@ const STYLES = `
   #ofc-regen.spinning svg {
     animation: ofc-spin 0.65s linear infinite;
   }
+
+  /* ── Mode toggle ─────────────────────────────────────────── */
+  #ofc-modes {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .ofc-mode-btn {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 100px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: none;
+    color: #2e2e48;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+
+  .ofc-mode-btn:hover { color: #5a5a7a; }
+
+  .ofc-mode-btn[data-mode="warm_up"].active {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.2);
+  }
+
+  .ofc-mode-btn[data-mode="sell"].active {
+    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.2);
+  }
+
+  .ofc-mode-btn[data-mode="re_engage"].active {
+    color: #a78bfa;
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.2);
+  }
+
+  #ofc-panel.collapsed #ofc-modes { display: none; }
 
   /* ── Body ───────────────────────────────────────────────── */
   #ofc-body {
@@ -460,6 +504,8 @@ export class UIOverlay {
   private insertHandler: ((text: string) => void) | null = null;
   private regenerateHandler: (() => void) | null = null;
   private notesSaveHandler: ((notes: string) => void) | null = null;
+  private modeChangeHandler: ((mode: SuggestionMode) => void) | null = null;
+  private activeMode: SuggestionMode = 'sell';
   private lastSavedNotes = '';
   private collapsed = false;
 
@@ -469,6 +515,10 @@ export class UIOverlay {
 
   setRegenerateHandler(fn: () => void): void {
     this.regenerateHandler = fn;
+  }
+
+  setModeChangeHandler(fn: (mode: SuggestionMode) => void): void {
+    this.modeChangeHandler = fn;
   }
 
   setNotesSaveHandler(fn: (notes: string) => void): void {
@@ -509,6 +559,11 @@ export class UIOverlay {
         <span class="ofc-logo">${ICON_SPARKLE}</span>
         <span id="ofc-label">AI Suggestions</span>
         <span id="ofc-count"></span>
+      </div>
+      <div id="ofc-modes">
+        <button class="ofc-mode-btn" data-mode="warm_up">Warm</button>
+        <button class="ofc-mode-btn active" data-mode="sell">Sell</button>
+        <button class="ofc-mode-btn" data-mode="re_engage">Re-engage</button>
       </div>
       <div id="ofc-actions">
         <button id="ofc-regen" class="ofc-hbtn" title="Regenerate suggestions" style="display:none">
@@ -566,6 +621,17 @@ export class UIOverlay {
 
     const collapseBtn = header.querySelector<HTMLButtonElement>('#ofc-collapse')!;
     collapseBtn.addEventListener('click', () => this.toggleCollapse());
+
+    // Wire mode toggle buttons
+    const modeBtns = header.querySelectorAll<HTMLButtonElement>('.ofc-mode-btn');
+    modeBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset['mode'] as SuggestionMode;
+        this.activeMode = mode;
+        modeBtns.forEach((b) => b.classList.toggle('active', b === btn));
+        this.modeChangeHandler?.(mode);
+      });
+    });
   }
 
   isAttached(): boolean {

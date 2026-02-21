@@ -48,7 +48,7 @@ async function handleMessage(
   request: BackgroundRequest
 ): Promise<BackgroundResponse> {
   if (request.type === 'GET_SUGGESTIONS') {
-    const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages } = request;
+    const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages, mode } = request;
 
     const apiKey = await getApiKey();
     const { system, user } = buildSuggestionPrompt({
@@ -58,6 +58,7 @@ async function handleMessage(
       variationHint,
       creatorProfile,
       creatorRealMessages,
+      mode,
     });
 
     // Use fallback model for long/complex conversations

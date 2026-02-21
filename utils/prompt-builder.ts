@@ -4,6 +4,7 @@ import type {
   CreatorPersona,
   CreatorType,
   CreatorProfile,
+  SuggestionMode,
 } from '../types/index';
 
 // ─── Per-type voice guidance ──────────────────────────────────────────────────
@@ -230,6 +231,28 @@ export function pickVariationHint(): string {
   return VARIATION_HINTS[Math.floor(Math.random() * VARIATION_HINTS.length)]!;
 }
 
+// ─── Mode tier instructions ───────────────────────────────────────────────────
+
+function buildModeTierInstructions(mode?: SuggestionMode): string {
+  if (mode === 'warm_up') {
+    return `Generate exactly 3 replies. ALL focus on rapport and genuine connection — NO upsells:
+1. first — ask something personal, show real curiosity
+2. second — build warmth, share something of yourself, invite them in
+3. third — keep the connection alive, light and comfortable`;
+  }
+  if (mode === 're_engage') {
+    return `Generate exactly 3 replies. This fan has gone quiet. ALL focus on reactivation:
+1. first — warm check-in, no pressure, acknowledge the gap naturally
+2. second — remind them what they're missing, personal and specific, no hard sell
+3. third — gentle nudge, give them an easy reason to reply`;
+  }
+  // Default: 'sell'
+  return `Generate exactly 3 replies. Each must have a clearly different approach:
+1. engage — build rapport, warmth, genuine connection. No sell at all.
+2. soft_upsell — natural, story-led nudge toward content. Never feels pushy.
+3. direct_upsell — clear call to action, confident, benefit-led. Still in-character.`;
+}
+
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
 interface PromptInput {
@@ -240,6 +263,7 @@ interface PromptInput {
   creatorProfile?: CreatorProfile;
   /** Creator's own sent messages extracted from conversation history */
   creatorRealMessages?: string[];
+  mode?: SuggestionMode;
 }
 
 interface BuiltPrompt {
@@ -278,7 +302,7 @@ ${examplesSection}`;
 }
 
 export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
-  const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages } = input;
+  const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages, mode } = input;
 
   const historyText = conversation
     .map((m) => `[${m.role === 'fan' ? 'Fan' : 'You'}]: ${m.text}`)
@@ -308,10 +332,7 @@ Name: ${fanProfile.displayName} | Subscribed: ${subDuration} | Total spent: $${f
 ${fanContext}
 
 ## Suggestion tiers
-Generate exactly 3 replies. Each must have a clearly different approach:
-1. engage — build rapport, warmth, genuine connection. No sell at all.
-2. soft_upsell — natural, story-led nudge toward content. Never feels pushy.
-3. direct_upsell — clear call to action, confident, benefit-led. Still in-character.
+${buildModeTierInstructions(mode)}
 
 ## Human typing behavior
 You are typing fast — on mobile or laptop, not drafting an essay.
@@ -329,7 +350,7 @@ You are typing fast — on mobile or laptop, not drafting an essay.
 - Vary sentence length. Mix short punchy lines with longer ones.
 - Respond ONLY with the JSON array. No preamble, no markdown fences.${lengthInstruction}
 
-Output format:
+Output format (type may be "engage" for all 3 in non-sell modes):
 [
   { "type": "engage", "text": "..." },
   { "type": "soft_upsell", "text": "..." },

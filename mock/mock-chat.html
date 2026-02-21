@@ -393,6 +393,13 @@
           const voiceGuide = VOICE_GUIDE[cp.type] || VOICE_GUIDE.woman;
           const fewShots = FEW_SHOTS[cp.type] || FEW_SHOTS.woman;
 
+          const mode = request.mode || 'sell';
+          const modeTiers = mode === 'warm_up'
+            ? `Generate exactly 3 replies. ALL focus on rapport and genuine connection — NO upsells:\n1. first — ask something personal, show real curiosity\n2. second — build warmth, share something of yourself, invite them in\n3. third — keep the connection alive, light and comfortable`
+            : mode === 're_engage'
+            ? `Generate exactly 3 replies. This fan has gone quiet. ALL focus on reactivation:\n1. first — warm check-in, no pressure, acknowledge the gap naturally\n2. second — remind them what they're missing, personal and specific, no hard sell\n3. third — gentle nudge, give them an easy reason to reply`
+            : `Generate exactly 3 replies with clearly different approaches:\n1. engage — build rapport, no sell at all.\n2. soft_upsell — natural, story-led nudge toward content.\n3. direct_upsell — clear CTA, confident, benefit-led.`;
+
           const systemPrompt = `You are a professional OnlyFans chatter writing AS the creator — the fan must believe they're talking directly to ${cp.name}.
 
 ## Your creator identity
@@ -407,17 +414,14 @@ ${fewShots}
 Name: ${fp.displayName} | Total spent: $${fp.lifetimeValue.toFixed(2)}
 
 ## Suggestion tiers
-Generate exactly 3 replies with clearly different approaches:
-1. engage — build rapport, no sell at all.
-2. soft_upsell — natural, story-led nudge toward content.
-3. direct_upsell — clear CTA, confident, benefit-led.
+${modeTiers}
 
 ## Rules
 - Each reply must differ in structure, length, and opening word.
 - Stay fully in character. No corporate language.
 - Respond ONLY with the JSON array. No preamble, no markdown fences.
 
-Output format:
+Output format (type may be "engage" for all 3 in non-sell modes):
 [
   { "type": "engage", "text": "..." },
   { "type": "soft_upsell", "text": "..." },
