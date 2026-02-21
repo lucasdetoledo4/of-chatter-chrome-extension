@@ -24,6 +24,8 @@ export type FanProfileUpdate = Partial<Omit<FanProfile, 'fanId'>>;
 
 export type SuggestionType = 'engage' | 'soft_upsell' | 'direct_upsell';
 
+export type SuggestionMode = 'warm_up' | 'sell' | 're_engage';
+
 export interface Suggestion {
   type: SuggestionType;
   text: string;
@@ -79,6 +81,7 @@ export interface GetSuggestionsRequest {
   creatorProfile?: CreatorProfile;
   /** Creator's own sent messages extracted from conversation history */
   creatorRealMessages?: string[];
+  mode?: SuggestionMode;
 }
 
 export interface AnalyzeCreatorStyleRequest {

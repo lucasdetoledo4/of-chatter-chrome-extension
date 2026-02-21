@@ -7,6 +7,7 @@ import type {
   GetSuggestionsRequest,
   AnalyzeCreatorStyleRequest,
   CreatorType,
+  SuggestionMode,
 } from '../types/index';
 import { observeChat, scrapeConversationHistory, findChatContainer, scrapeFanName } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
@@ -281,6 +282,7 @@ async function handleNewMessage(
     creatorPersona: getActivePersona(),
     creatorProfile: cachedCreatorProfile ?? undefined,
     creatorRealMessages,
+    mode: activeSuggestionMode,
   };
 
   // Expose the request so regenerate can replay it
@@ -307,6 +309,7 @@ async function fireSuggestionsRequest(
 // Without these, navigating away and back creates duplicate panels and stale observers.
 let _activeHostGuard: MutationObserver | null = null;
 let _activeStopObserver: (() => void) | null = null;
+let activeSuggestionMode: SuggestionMode = 'sell';
 
 async function initializeChatAssistant(): Promise<void> {
   // Tear down previous instance before starting fresh.
@@ -316,6 +319,7 @@ async function initializeChatAssistant(): Promise<void> {
   _activeHostGuard = null;
   _activeStopObserver?.();
   _activeStopObserver = null;
+  activeSuggestionMode = 'sell';
 
   const fanId = extractFanIdFromUrl(location.pathname);
   if (!fanId) return;
@@ -351,6 +355,16 @@ async function initializeChatAssistant(): Promise<void> {
         { ...lastRequest, variationHint: pickVariationHint() },
         overlay
       );
+    }
+  });
+
+  overlay.setModeChangeHandler((mode) => {
+    activeSuggestionMode = mode;
+    if (lastRequest) {
+      const req = { ...lastRequest, mode };
+      lastRequest = req;          // keep regen in sync with current mode
+      overlay.showLoading();
+      void fireSuggestionsRequest(req, overlay);
     }
   });
 
