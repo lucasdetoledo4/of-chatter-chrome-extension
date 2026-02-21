@@ -351,6 +351,9 @@
     runtime: {
       onMessage: { addListener: () => {} },
       onInstalled: { addListener: () => {} },
+      // Stub: returns a fake extension URL so the diag-bridge script load fails
+      // gracefully instead of throwing "getURL is not a function".
+      getURL: (path) => `chrome-extension://mock-ext-id/${path}`,
       sendMessage: async (request) => {
         // Intercept GET_SUGGESTIONS — call Anthropic API directly
         if (request.type === 'GET_SUGGESTIONS') {
