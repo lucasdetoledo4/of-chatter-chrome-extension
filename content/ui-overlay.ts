@@ -1,4 +1,4 @@
-import type { Suggestion, SuggestionType } from '../types/index';
+import type { Suggestion, SuggestionType, FanProfile } from '../types/index';
 
 const HOST_ID = 'ofc-suggestion-host';
 
@@ -321,6 +321,39 @@ const STYLES = `
     color: #b0b0cc;
   }
 
+  /* ── Fan context strip ──────────────────────────────── */
+  #ofc-fan-ctx {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: #0b0b11;
+    border-bottom: 1px solid #18181f;
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+
+  #ofc-panel.collapsed #ofc-fan-ctx { display: none !important; }
+
+  .ofc-ctx-spend {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .ofc-ctx-sep { color: #252535; }
+
+  .ofc-ctx-dur { color: #3a3a58; }
+
+  .ofc-ctx-tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #383858;
+  }
 `;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -333,6 +366,29 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// ─── Fan context helpers ──────────────────────────────────────────────────────
+
+function spendColor(value: number): string {
+  if (value === 0) return '#3a3a58';
+  if (value < 50) return '#5a5a88';
+  if (value < 200) return '#d97706';
+  return '#10b981';
+}
+
+function formatSpend(value: number): string {
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
+  return `$${value.toFixed(0)}`;
+}
+
+function formatSubDuration(firstSeen: string): string {
+  const days = Math.floor((Date.now() - new Date(firstSeen).getTime()) / 86400000);
+  if (days < 1) return 'new today';
+  if (days < 7) return `${days}d`;
+  if (days < 30) return `${Math.floor(days / 7)}wk`;
+  if (days < 365) return `${Math.floor(days / 30)}mo`;
+  return `${Math.floor(days / 365)}yr`;
 }
 
 // ─── UIOverlay class ──────────────────────────────────────────────────────────
@@ -401,7 +457,11 @@ export class UIOverlay {
     const body = document.createElement('div');
     body.id = 'ofc-body';
 
+    const fanCtx = document.createElement('div');
+    fanCtx.id = 'ofc-fan-ctx';
+
     panel.appendChild(header);
+    panel.appendChild(fanCtx);
     panel.appendChild(body);
     shadow.appendChild(panel);
 
@@ -506,6 +566,24 @@ export class UIOverlay {
         <span>${escapeHtml(msg)}</span>
       </div>
     `);
+  }
+
+  showFanContext(fan: FanProfile): void {
+    const ctx = this.shadow?.querySelector<HTMLElement>('#ofc-fan-ctx');
+    if (!ctx) return;
+
+    const tagPills = fan.tags
+      .slice(0, 3)
+      .map((t) => `<span class="ofc-ctx-tag">${escapeHtml(t)}</span>`)
+      .join('');
+
+    ctx.innerHTML = `
+      <span class="ofc-ctx-spend" style="color:${spendColor(fan.lifetimeValue)}">${formatSpend(fan.lifetimeValue)}</span>
+      <span class="ofc-ctx-sep">·</span>
+      <span class="ofc-ctx-dur">${formatSubDuration(fan.firstSeen)}</span>
+      ${fan.tags.length > 0 ? `<span class="ofc-ctx-sep">·</span>${tagPills}` : ''}
+    `;
+    ctx.style.display = 'flex';
   }
 
   remove(): void {
