@@ -354,6 +354,64 @@ const STYLES = `
     background: rgba(255, 255, 255, 0.04);
     color: #383858;
   }
+
+  /* ── Notes ──────────────────────────────────────────── */
+  #ofc-notes {
+    padding: 6px 10px 8px;
+    background: #0b0b11;
+    border-top: 1px solid #18181f;
+    position: relative;
+  }
+
+  #ofc-panel.collapsed #ofc-notes { display: none; }
+
+  .ofc-notes-label {
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #2e2e45;
+    margin-bottom: 4px;
+  }
+
+  .ofc-notes-ta {
+    width: 100%;
+    background: #0e0e18;
+    border: 1px solid #1e1e2c;
+    border-radius: 6px;
+    color: #6868a0;
+    font-size: 12px;
+    font-family: inherit;
+    line-height: 1.5;
+    padding: 5px 8px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .ofc-notes-ta::placeholder { color: #252538; }
+
+  .ofc-notes-ta:focus {
+    border-color: #2e2e4a;
+    color: #9090c0;
+  }
+
+  .ofc-notes-saved {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #10b981;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+
+  .ofc-notes-saved.visible { opacity: 1; }
 `;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -399,6 +457,8 @@ export class UIOverlay {
   private panel: HTMLElement | null = null;
   private insertHandler: ((text: string) => void) | null = null;
   private regenerateHandler: (() => void) | null = null;
+  private notesSaveHandler: ((notes: string) => void) | null = null;
+  private lastSavedNotes = '';
   private collapsed = false;
 
   setInsertHandler(fn: (text: string) => void): void {
@@ -407,6 +467,10 @@ export class UIOverlay {
 
   setRegenerateHandler(fn: () => void): void {
     this.regenerateHandler = fn;
+  }
+
+  setNotesSaveHandler(fn: (notes: string) => void): void {
+    this.notesSaveHandler = fn;
   }
 
   inject(anchor: Element): void {
@@ -460,14 +524,37 @@ export class UIOverlay {
     const fanCtx = document.createElement('div');
     fanCtx.id = 'ofc-fan-ctx';
 
+    const notesSection = document.createElement('div');
+    notesSection.id = 'ofc-notes';
+    notesSection.innerHTML = `
+      <label class="ofc-notes-label">Notes</label>
+      <textarea class="ofc-notes-ta" placeholder="Fan notes…" rows="2" spellcheck="false"></textarea>
+      <span class="ofc-notes-saved">Saved</span>
+    `;
+
     panel.appendChild(header);
     panel.appendChild(fanCtx);
     panel.appendChild(body);
+    panel.appendChild(notesSection);
     shadow.appendChild(panel);
 
     this.host = host;
     this.shadow = shadow;
     this.panel = panel;
+
+    // Wire notes textarea blur → auto-save
+    const notesTa = notesSection.querySelector<HTMLTextAreaElement>('.ofc-notes-ta')!;
+    notesTa.addEventListener('blur', () => {
+      const val = notesTa.value;
+      if (val === this.lastSavedNotes) return;
+      this.lastSavedNotes = val;
+      this.notesSaveHandler?.(val);
+      const savedEl = notesSection.querySelector<HTMLElement>('.ofc-notes-saved');
+      if (savedEl) {
+        savedEl.classList.add('visible');
+        setTimeout(() => savedEl.classList.remove('visible'), 1500);
+      }
+    });
 
     // Wire header buttons
     const regenBtn = header.querySelector<HTMLButtonElement>('#ofc-regen')!;
@@ -584,6 +671,13 @@ export class UIOverlay {
       ${fan.tags.length > 0 ? `<span class="ofc-ctx-sep">·</span>${tagPills}` : ''}
     `;
     ctx.style.display = 'flex';
+
+    // Populate notes textarea with stored notes
+    const notesTa = this.shadow?.querySelector<HTMLTextAreaElement>('.ofc-notes-ta');
+    if (notesTa) {
+      notesTa.value = fan.notes ?? '';
+      this.lastSavedNotes = fan.notes ?? '';
+    }
   }
 
   remove(): void {

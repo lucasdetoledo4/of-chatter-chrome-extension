@@ -336,6 +336,7 @@ async function initializeChatAssistant(): Promise<void> {
 
   const overlay = new UIOverlay();
   overlay.setInsertHandler(insertIntoChat);
+  overlay.setNotesSaveHandler((notes) => { void upsertFanProfile(fanId, { notes }); });
 
   // Last request is stored so regenerate can replay it
   let lastRequest: GetSuggestionsRequest | null = null;
