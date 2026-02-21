@@ -227,8 +227,19 @@ const VARIATION_HINTS = [
   'Be raw and unfiltered — messier grammar, shorter bursts, more honest energy.',
 ];
 
+// Track last 3 used hint indices so reregen always feels different.
+const _recentHintIndices: number[] = [];
+
 export function pickVariationHint(): string {
-  return VARIATION_HINTS[Math.floor(Math.random() * VARIATION_HINTS.length)]!;
+  const available = VARIATION_HINTS.map((_, i) => i).filter(
+    (i) => !_recentHintIndices.includes(i)
+  );
+  // Fallback: if somehow all are excluded (shouldn't happen), use full list
+  const pool = available.length > 0 ? available : VARIATION_HINTS.map((_, i) => i);
+  const chosen = pool[Math.floor(Math.random() * pool.length)]!;
+  _recentHintIndices.push(chosen);
+  if (_recentHintIndices.length > 3) _recentHintIndices.shift();
+  return VARIATION_HINTS[chosen]!;
 }
 
 // ─── Mode tier instructions ───────────────────────────────────────────────────
@@ -252,6 +263,9 @@ function buildModeTierInstructions(mode?: SuggestionMode): string {
 2. soft_upsell — natural, story-led nudge toward content. Never feels pushy.
 3. direct_upsell — clear call to action, confident, benefit-led. Still in-character.`;
 }
+
+// Cap conversation history to avoid runaway token costs on long chats.
+const MAX_CONVERSATION_MESSAGES = 20;
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
@@ -304,7 +318,10 @@ ${examplesSection}`;
 export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
   const { conversation, fanProfile, creatorPersona, variationHint, creatorProfile, creatorRealMessages, mode } = input;
 
-  const historyText = conversation
+  // Limit to the most recent messages to keep token usage predictable.
+  const recentConversation = conversation.slice(-MAX_CONVERSATION_MESSAGES);
+
+  const historyText = recentConversation
     .map((m) => `[${m.role === 'fan' ? 'Fan' : 'You'}]: ${m.text}`)
     .join('\n');
 
@@ -315,7 +332,7 @@ export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
 
   // Scale reply length to the fan's message complexity.
   // Short questions (≤8 words) get tight 1-2 sentence replies — not paragraphs.
-  const lastFanMsg = [...conversation].reverse().find((m) => m.role === 'fan');
+  const lastFanMsg = [...recentConversation].reverse().find((m) => m.role === 'fan');
   const wordCount = lastFanMsg?.text.trim().split(/\s+/).length ?? 0;
   const lengthInstruction = wordCount <= 8
     ? '\n\n## Length\nThe fan sent a short message. Keep every reply to 1–2 sentences max. Match their brevity — don\'t over-explain.'
@@ -361,7 +378,7 @@ Output format (type may be "engage" for all 3 in non-sell modes):
     ? `\n\nIMPORTANT: ${variationHint} Make these feel completely different from any previous response.`
     : '';
 
-  const user = `Conversation (${conversation.length} messages):
+  const user = `Conversation (${recentConversation.length} messages):
 ${historyText}
 
 Reply as ${displayName} now.${variationLine}`;
