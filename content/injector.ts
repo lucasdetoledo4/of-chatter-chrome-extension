@@ -295,7 +295,9 @@ async function fireSuggestionsRequest(
   req: GetSuggestionsRequest,
   overlay: UIOverlay
 ): Promise<void> {
+  const gen = ++_suggestionGeneration;
   const response = await requestSuggestions(req);
+  if (gen !== _suggestionGeneration) return; // superseded by a newer request
   if (response.success) {
     overlay.showSuggestions(response.suggestions);
   } else {
@@ -310,6 +312,9 @@ async function fireSuggestionsRequest(
 let _activeHostGuard: MutationObserver | null = null;
 let _activeStopObserver: (() => void) | null = null;
 let activeSuggestionMode: SuggestionMode = 'sell';
+// Incremented on every new suggestion request. Responses from superseded
+// requests are discarded, preventing races when fan messages arrive fast.
+let _suggestionGeneration = 0;
 
 async function initializeChatAssistant(): Promise<void> {
   // Tear down previous instance before starting fresh.
