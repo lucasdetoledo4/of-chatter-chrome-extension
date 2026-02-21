@@ -23,6 +23,14 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
+// Also prune on every browser startup — onInstalled only fires on extension install/update.
+chrome.runtime.onStartup.addListener(async () => {
+  const pruned = await pruneOldProfiles();
+  if (pruned > 0) {
+    console.log(`[OFC SW] Pruned ${pruned} stale fan profiles on startup.`);
+  }
+});
+
 // ─── Message Handler ──────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener(
@@ -123,16 +131,26 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
     messages: [{ role: 'user', content: user }],
   };
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify(body),
-  });
+  const fetchOnce = () =>
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body),
+    });
+
+  let response = await fetchOnce();
+
+  // Retry once on transient server errors (5xx) or rate-limit overload (529).
+  // 4xx errors (bad key, invalid request) are not retried — they won't recover.
+  if (response.status >= 500 || response.status === 529) {
+    await new Promise((r) => setTimeout(r, 1000));
+    response = await fetchOnce();
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
