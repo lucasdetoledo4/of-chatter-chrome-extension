@@ -66,6 +66,7 @@ export interface CreatorProfile {
   profilePhotoUrl?: string;
   recentCaptions: string[];
   writingStyle?: string;      // AI-generated style summary, cached after first run
+  styleAnalyzedAt?: string;   // ISO 8601 — when writingStyle was last generated
   scrapedAt: string;          // ISO 8601
 }
 

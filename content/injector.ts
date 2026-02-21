@@ -60,20 +60,31 @@ async function loadCreatorState(): Promise<void> {
   cachedCreatorProfile = await getCreatorProfile('self');
 }
 
+const STYLE_REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 /** Fire-and-forget style analysis when we have enough real messages. */
 function triggerStyleAnalysisIfNeeded(creatorRealMessages: string[]): void {
-  if (creatorRealMessages.length < 5 || cachedCreatorProfile?.writingStyle) return;
+  if (creatorRealMessages.length < 5) return;
+
+  // Skip if a fresh style exists (analyzed within the last 7 days)
+  const analyzedAt = cachedCreatorProfile?.styleAnalyzedAt;
+  const isStale = !analyzedAt || Date.now() - new Date(analyzedAt).getTime() > STYLE_REFRESH_MS;
+  if (cachedCreatorProfile?.writingStyle && !isStale) return;
 
   const req: AnalyzeCreatorStyleRequest = {
     type: 'ANALYZE_CREATOR_STYLE',
     creatorMessages: creatorRealMessages,
   };
-  console.log('[OFC] Style analysis triggered — analysing creator voice…');
+  const reason = cachedCreatorProfile?.writingStyle ? 'refreshing stale style' : 'analysing creator voice';
+  console.log(`[OFC] Style analysis triggered — ${reason}…`);
 
   chrome.runtime.sendMessage<AnalyzeCreatorStyleRequest, BackgroundResponse>(req)
     .then(async (resp) => {
       if (resp.success && resp.writingStyle) {
-        cachedCreatorProfile = await upsertCreatorProfile('self', { writingStyle: resp.writingStyle });
+        cachedCreatorProfile = await upsertCreatorProfile('self', {
+          writingStyle: resp.writingStyle,
+          styleAnalyzedAt: new Date().toISOString(),
+        });
         console.log('[OFC] Style analysis complete — creator voice cached');
       }
     })
