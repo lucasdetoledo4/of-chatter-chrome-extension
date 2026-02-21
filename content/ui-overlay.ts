@@ -73,8 +73,8 @@ const STYLES = `
       0 8px 32px rgba(0, 0, 0, 0.5),
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
     width: 100%;
-    min-width: 260px;
-    max-width: 440px;
+    min-width: 320px;
+    max-width: 560px;
   }
 
   /* ── Header ─────────────────────────────────────────────── */
