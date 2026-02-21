@@ -540,6 +540,13 @@ export class UIOverlay {
     this.notesSaveHandler = fn;
   }
 
+  /** Set the active mode — updates internal state and syncs button classes if injected. */
+  setMode(mode: SuggestionMode): void {
+    this.activeMode = mode;
+    const btns = this.shadow?.querySelectorAll<HTMLButtonElement>('.ofc-mode-btn');
+    btns?.forEach((b) => b.classList.toggle('active', b.dataset['mode'] === mode));
+  }
+
   inject(anchor: Element, insertPosition: InsertPosition = 'beforebegin'): void {
     if (this.isAttached()) return;
 

@@ -324,7 +324,6 @@ async function initializeChatAssistant(): Promise<void> {
   _activeHostGuard = null;
   _activeStopObserver?.();
   _activeStopObserver = null;
-  activeSuggestionMode = 'sell';
   _suggestionGeneration = 0; // prevent stale gen values across re-navigations
 
   const fanId = extractFanIdFromUrl(location.pathname);
@@ -334,6 +333,11 @@ async function initializeChatAssistant(): Promise<void> {
 
   // Load creator type (popup setting) and cached creator profile
   await loadCreatorState();
+
+  // Restore persisted suggestion mode (survives page reloads and extension updates)
+  const modeResult = await chrome.storage.local.get('OFC_SUGGESTION_MODE');
+  const persistedMode = modeResult['OFC_SUGGESTION_MODE'] as SuggestionMode | undefined;
+  if (persistedMode) activeSuggestionMode = persistedMode;
 
   // Scrape creator identity from the sidebar nav — available on every page,
   // so we get the real name without requiring a profile page visit.
@@ -350,6 +354,7 @@ async function initializeChatAssistant(): Promise<void> {
   }
 
   const overlay = new UIOverlay();
+  overlay.setMode(activeSuggestionMode); // apply persisted mode before first inject
   overlay.setInsertHandler(insertIntoChat);
   overlay.setNotesSaveHandler((notes) => { void upsertFanProfile(fanId, { notes }); });
 
@@ -366,6 +371,7 @@ async function initializeChatAssistant(): Promise<void> {
 
   overlay.setModeChangeHandler((mode) => {
     activeSuggestionMode = mode;
+    void chrome.storage.local.set({ OFC_SUGGESTION_MODE: mode });
     if (lastRequest) {
       const req = { ...lastRequest, mode };
       lastRequest = req;          // keep regen in sync with current mode
