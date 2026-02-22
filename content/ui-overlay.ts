@@ -369,6 +369,21 @@ const STYLES = `
     border-color: rgba(16, 185, 129, 0.22);
   }
 
+  /* ── Keyboard shortcut hints ─────────────────────── */
+  .ofc-kbd {
+    font-size: 9px;
+    color: #252538;
+    background: #131320;
+    border: 1px solid #232338;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+    transition: color 0.12s;
+  }
+  .ofc-card:hover .ofc-kbd { color: #3a3a58; }
+
   .ofc-text {
     color: #9898b8;
     font-size: 13px;
@@ -523,6 +538,7 @@ export class UIOverlay {
   private activeMode: SuggestionMode = 'sell';
   private lastSavedNotes = '';
   private collapsed = false;
+  private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
@@ -588,7 +604,7 @@ export class UIOverlay {
         <button class="ofc-mode-btn${this.activeMode === 're_engage' ? ' active' : ''}" data-mode="re_engage">Re-engage</button>
       </div>
       <div id="ofc-actions">
-        <button id="ofc-regen" class="ofc-hbtn" title="Regenerate suggestions" style="display:none">
+        <button id="ofc-regen" class="ofc-hbtn" title="Regenerate (Alt+R)" style="display:none">
           ${ICON_REGEN}
         </button>
         <button id="ofc-collapse" class="ofc-hbtn" title="Collapse panel">
@@ -654,6 +670,21 @@ export class UIOverlay {
         this.modeChangeHandler?.(mode);
       });
     });
+
+    // Keyboard shortcuts — Alt+1/2/3 inserts suggestion, Alt+R regens
+    // Remove any previous listener first (handles re-injection after React removes the panel)
+    if (this._keydownHandler) {
+      document.removeEventListener('keydown', this._keydownHandler);
+    }
+    const keydownHandler = (e: KeyboardEvent): void => {
+      if (!e.altKey) return;
+      if (e.key === '1') { e.preventDefault(); this.insertCard(0); }
+      else if (e.key === '2') { e.preventDefault(); this.insertCard(1); }
+      else if (e.key === '3') { e.preventDefault(); this.insertCard(2); }
+      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); this.regenerateHandler?.(); }
+    };
+    document.addEventListener('keydown', keydownHandler);
+    this._keydownHandler = keydownHandler;
   }
 
   isAttached(): boolean {
@@ -690,7 +721,10 @@ export class UIOverlay {
                 <span class="ofc-badge" style="background:${cfg.labelBg};color:${cfg.labelColor};">
                   ${escapeHtml(cfg.label)}
                 </span>
-                <button class="ofc-use-btn">Use →</button>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <span class="ofc-kbd" title="Alt+${i + 1}">alt ${i + 1}</span>
+                  <button class="ofc-use-btn">Use →</button>
+                </div>
               </div>
               <div class="ofc-text">${escapeHtml(s.text)}</div>
             </div>
@@ -775,6 +809,10 @@ export class UIOverlay {
   }
 
   remove(): void {
+    if (this._keydownHandler) {
+      document.removeEventListener('keydown', this._keydownHandler);
+      this._keydownHandler = null;
+    }
     this.host?.remove();
     this.host = null;
     this.shadow = null;
@@ -782,6 +820,33 @@ export class UIOverlay {
   }
 
   // ─── Private ──────────────────────────────────────────────
+
+  /** Insert the suggestion card at the given zero-based index via keyboard shortcut. */
+  private insertCard(index: number): void {
+    const cards = this.shadow?.querySelectorAll<HTMLElement>('.ofc-card');
+    if (!cards || index >= cards.length) return;
+    const card = cards[index];
+    if (!card) return;
+    const text = card.dataset['text'] ?? '';
+    if (!text) return;
+
+    if (this.insertHandler) {
+      this.insertHandler(text);
+    } else {
+      void navigator.clipboard.writeText(text);
+    }
+
+    // Mirror the visual feedback of a click on the use-btn
+    const useBtn = card.querySelector<HTMLButtonElement>('.ofc-use-btn');
+    if (useBtn) {
+      useBtn.textContent = '✓ Inserted';
+      useBtn.classList.add('done');
+      setTimeout(() => {
+        useBtn.textContent = 'Use →';
+        useBtn.classList.remove('done');
+      }, 2000);
+    }
+  }
 
   private toggleCollapse(): void {
     this.collapsed = !this.collapsed;
