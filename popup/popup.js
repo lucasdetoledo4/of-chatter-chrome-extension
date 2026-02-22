@@ -1,13 +1,11 @@
-const apiKeyInput  = document.getElementById('apiKey');
-const keyStatus    = document.getElementById('keyStatus');
-const keyDot       = document.getElementById('keyDot');
-const keyStatusText = document.getElementById('keyStatusText');
-const saveBtn      = document.getElementById('save');
-const testBtn      = document.getElementById('test');
-const statusEl     = document.getElementById('status');
-const creatorGrid  = document.getElementById('creatorGrid');
-
-let selectedCreatorType = 'woman';
+const apiKeyInput    = document.getElementById('apiKey');
+const creatorSelect  = document.getElementById('creatorType');
+const keyPill        = document.getElementById('keyStatus');
+const keyDot         = document.getElementById('keyDot');
+const keyStatusText  = document.getElementById('keyStatusText');
+const saveBtn        = document.getElementById('save');
+const testBtn        = document.getElementById('test');
+const statusEl       = document.getElementById('status');
 
 // ─── Load saved settings ──────────────────────────────────────────────────────
 
@@ -17,43 +15,31 @@ chrome.storage.sync.get(['ANTHROPIC_API_KEY', 'CREATOR_TYPE'], (data) => {
     apiKeyInput.placeholder = `••••••••••${last4}`;
     setKeyStatus(true, `Key saved  ···${last4}`);
   }
-
-  const type = data.CREATOR_TYPE || 'woman';
-  setActiveCard(type);
+  if (data.CREATOR_TYPE) {
+    creatorSelect.value = data.CREATOR_TYPE;
+  }
 });
-
-// ─── Creator type cards ───────────────────────────────────────────────────────
-
-creatorGrid.querySelectorAll('.creator-card').forEach((card) => {
-  card.addEventListener('click', () => setActiveCard(card.dataset.value));
-});
-
-function setActiveCard(value) {
-  selectedCreatorType = value;
-  creatorGrid.querySelectorAll('.creator-card').forEach((c) => {
-    c.classList.toggle('active', c.dataset.value === value);
-  });
-}
 
 // ─── API key status ───────────────────────────────────────────────────────────
 
 function setKeyStatus(ok, text) {
-  keyStatus.className = `key-status ${ok ? 'ok' : 'missing'}`;
-  keyDot.className    = `key-dot ${ok ? 'ok' : 'missing'}`;
+  keyPill.className  = `key-pill ${ok ? 'ok' : 'missing'}`;
+  keyDot.className   = `key-dot ${ok ? 'ok' : 'missing'}`;
   keyStatusText.textContent = text;
 }
 
 // ─── Save ─────────────────────────────────────────────────────────────────────
 
 saveBtn.addEventListener('click', () => {
-  const key = apiKeyInput.value.trim();
+  const key         = apiKeyInput.value.trim();
+  const creatorType = creatorSelect.value;
 
   if (key && !key.startsWith('sk-ant-')) {
     showStatus('Key must start with sk-ant-', 'error');
     return;
   }
 
-  const toSave = { CREATOR_TYPE: selectedCreatorType };
+  const toSave = { CREATOR_TYPE: creatorType };
   if (key) toSave.ANTHROPIC_API_KEY = key;
 
   chrome.storage.sync.set(toSave, () => {
@@ -63,14 +49,13 @@ saveBtn.addEventListener('click', () => {
       apiKeyInput.placeholder = `••••••••••${last4}`;
       setKeyStatus(true, `Key saved  ···${last4}`);
     }
-    showStatus('Settings saved', 'ok');
+    showStatus('Saved', 'ok');
   });
 });
 
 // ─── Test connection ──────────────────────────────────────────────────────────
 
 testBtn.addEventListener('click', async () => {
-  // Prefer the just-typed key over the stored one
   const typedKey = apiKeyInput.value.trim();
 
   let apiKey = typedKey;
@@ -111,7 +96,7 @@ testBtn.addEventListener('click', async () => {
       const msg  = body?.error?.message || `Error ${response.status}`;
       showStatus(msg, 'error');
     }
-  } catch (err) {
+  } catch {
     showStatus('Network error — check your connection', 'error');
   } finally {
     testBtn.disabled = false;
@@ -123,5 +108,5 @@ testBtn.addEventListener('click', async () => {
 
 function showStatus(text, type) {
   statusEl.textContent = text;
-  statusEl.className = type || '';
+  statusEl.className   = type || '';
 }
