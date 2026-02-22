@@ -131,7 +131,7 @@ const STYLES = `
   #ofc-count {
     font-size: 10px;
     font-weight: 400;
-    color: #383850;
+    color: #52526e;
     letter-spacing: 0;
     text-transform: none;
     white-space: nowrap;
@@ -147,7 +147,7 @@ const STYLES = `
   .ofc-hbtn {
     background: none;
     border: none;
-    color: #383858;
+    color: #52527a;
     cursor: pointer;
     padding: 5px;
     border-radius: 7px;
@@ -167,6 +167,10 @@ const STYLES = `
     animation: ofc-spin 0.65s linear infinite;
   }
 
+  /* Regen in-progress: dim suggestions, keep them visible while waiting */
+  #ofc-body.regen-loading { opacity: 0.38; pointer-events: none; transition: opacity 0.15s; }
+  #ofc-body { transition: opacity 0.2s; }
+
   /* ── Mode toggle ─────────────────────────────────────────── */
   #ofc-modes {
     display: flex;
@@ -183,13 +187,13 @@ const STYLES = `
     border: 1px solid transparent;
     cursor: pointer;
     background: none;
-    color: #2e2e48;
+    color: #58587a;
     transition: color 0.12s, background 0.12s, border-color 0.12s;
     white-space: nowrap;
     font-family: inherit;
   }
 
-  .ofc-mode-btn:hover { color: #5a5a7a; }
+  .ofc-mode-btn:hover { color: #8080a8; }
 
   .ofc-mode-btn[data-mode="warm_up"].active {
     color: #34d399;
@@ -414,9 +418,9 @@ const STYLES = `
     letter-spacing: 0.01em;
   }
 
-  .ofc-ctx-sep { color: #252535; }
+  .ofc-ctx-sep { color: #363650; }
 
-  .ofc-ctx-dur { color: #3a3a58; }
+  .ofc-ctx-dur { color: #525272; }
 
   .ofc-ctx-tag {
     font-size: 9px;
@@ -445,7 +449,7 @@ const STYLES = `
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #2e2e45;
+    color: #424260;
     margin-bottom: 4px;
   }
 
@@ -693,6 +697,7 @@ export class UIOverlay {
 
   showLoading(): void {
     if (!this.panel) return;
+    this.clearRegenLoading();
     this.setRegenVisible(false);
     this.setCount('');
     this.setBodyContent(`
@@ -703,8 +708,20 @@ export class UIOverlay {
     `);
   }
 
+  /** Regen-specific loading: keep current suggestions visible but dimmed, spin the icon. */
+  showRegenLoading(): void {
+    const regenBtn = this.shadow?.querySelector<HTMLButtonElement>('#ofc-regen');
+    if (regenBtn) {
+      regenBtn.classList.add('spinning');
+      regenBtn.disabled = true;
+    }
+    const body = this.panel?.querySelector<HTMLElement>('#ofc-body');
+    body?.classList.add('regen-loading');
+  }
+
   showSuggestions(suggestions: Suggestion[]): void {
     if (!this.panel) return;
+    this.clearRegenLoading();
 
     const count = suggestions.length;
     this.setCount(count > 0 ? `${count} suggestion${count === 1 ? '' : 's'}` : '');
@@ -772,6 +789,7 @@ export class UIOverlay {
 
   showError(msg: string): void {
     if (!this.panel) return;
+    this.clearRegenLoading();
     this.setRegenVisible(true);
     this.setCount('');
     this.setBodyContent(`
@@ -856,6 +874,16 @@ export class UIOverlay {
       collapseBtn.innerHTML = this.collapsed ? ICON_CHEVRON_DOWN : ICON_CHEVRON_UP;
       collapseBtn.setAttribute('title', this.collapsed ? 'Expand panel' : 'Collapse panel');
     }
+  }
+
+  private clearRegenLoading(): void {
+    const regenBtn = this.shadow?.querySelector<HTMLButtonElement>('#ofc-regen');
+    if (regenBtn) {
+      regenBtn.classList.remove('spinning');
+      regenBtn.disabled = false;
+    }
+    const body = this.panel?.querySelector<HTMLElement>('#ofc-body');
+    body?.classList.remove('regen-loading');
   }
 
   private setRegenVisible(visible: boolean): void {

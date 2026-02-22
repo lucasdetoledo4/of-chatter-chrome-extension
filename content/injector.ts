@@ -373,6 +373,7 @@ async function initializeChatAssistant(): Promise<void> {
   let lastRequest: GetSuggestionsRequest | null = null;
   overlay.setRegenerateHandler(() => {
     if (lastRequest) {
+      overlay.showRegenLoading();
       void fireSuggestionsRequest(
         { ...lastRequest, variationHint: pickVariationHint() },
         overlay
