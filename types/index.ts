@@ -60,7 +60,7 @@ export interface CreatorPersona {
 // ─── Creator Profile ──────────────────────────────────────────────────────────
 
 export interface CreatorProfile {
-  creatorId: string;          // 'self' — one creator per install for now
+  creatorId: string;
   displayName: string;
   bio: string;
   profilePhotoUrl?: string;
@@ -68,6 +68,15 @@ export interface CreatorProfile {
   writingStyle?: string;      // AI-generated style summary, cached after first run
   styleAnalyzedAt?: string;   // ISO 8601 — when writingStyle was last generated
   scrapedAt: string;          // ISO 8601
+}
+
+// ─── Creator Account ──────────────────────────────────────────────────────────
+
+export interface CreatorAccount {
+  id: string;        // e.g. "c_1741234567890"
+  name: string;      // display name, e.g. "Sofia"
+  type: CreatorType;
+  createdAt: string; // ISO 8601
 }
 
 // ─── Background Messaging ─────────────────────────────────────────────────────
@@ -136,5 +145,7 @@ export interface SyncStorageSchema {
   ANTHROPIC_API_KEY?: string;
   DEFAULT_MODEL?: string;
   MAX_SUGGESTIONS?: number;
-  CREATOR_TYPE?: string;
+  CREATOR_TYPE?: string;          // kept for migration only
+  ACTIVE_CREATOR_ID?: string;
+  CREATORS?: CreatorAccount[];
 }

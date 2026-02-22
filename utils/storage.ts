@@ -1,4 +1,4 @@
-import type { FanProfile, FanProfileUpdate, CreatorProfile } from '../types/index';
+import type { FanProfile, FanProfileUpdate, CreatorProfile, CreatorAccount } from '../types/index';
 
 const FAN_KEY_PREFIX = 'fan:';
 // Prune profiles not seen in this many days
@@ -85,6 +85,30 @@ export async function upsertCreatorProfile(
 
   await chrome.storage.local.set({ [creatorKey(creatorId)]: profile });
   return profile;
+}
+
+// ─── Creator Accounts ─────────────────────────────────────────────────────────
+
+export async function getCreators(): Promise<CreatorAccount[]> {
+  const r = await chrome.storage.sync.get('CREATORS');
+  return (r['CREATORS'] as CreatorAccount[]) ?? [];
+}
+
+export async function upsertCreatorAccount(account: CreatorAccount): Promise<void> {
+  const list = await getCreators();
+  const idx = list.findIndex((c) => c.id === account.id);
+  if (idx >= 0) list[idx] = account; else list.push(account);
+  await chrome.storage.sync.set({ CREATORS: list });
+}
+
+export async function deleteCreatorAccount(id: string): Promise<void> {
+  const list = await getCreators();
+  await chrome.storage.sync.set({ CREATORS: list.filter((c) => c.id !== id) });
+}
+
+export async function getActiveCreatorId(): Promise<string | undefined> {
+  const r = await chrome.storage.sync.get('ACTIVE_CREATOR_ID');
+  return r['ACTIVE_CREATOR_ID'] as string | undefined;
 }
 
 // ─── Fan Profile ──────────────────────────────────────────────────────────────

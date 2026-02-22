@@ -432,14 +432,17 @@
           const result = {};
           const keyArr = Array.isArray(keys) ? keys : (typeof keys === 'string' ? [keys] : Object.keys(keys));
           for (const k of keyArr) {
-            const val = localStorage.getItem('MOCK_SYNC_' + k);
-            if (val !== null) result[k] = k === 'MAX_SUGGESTIONS' ? Number(val) : val;
+            const raw = localStorage.getItem('MOCK_SYNC_' + k);
+            if (raw !== null) {
+              // JSON.parse handles objects/arrays; fall back to raw string for plain values
+              try { result[k] = JSON.parse(raw); } catch { result[k] = raw; }
+            }
           }
           return Promise.resolve(result);
         },
         set: (obj) => {
           for (const [k, v] of Object.entries(obj)) {
-            localStorage.setItem('MOCK_SYNC_' + k, String(v));
+            localStorage.setItem('MOCK_SYNC_' + k, JSON.stringify(v));
           }
           return Promise.resolve();
         },
@@ -466,6 +469,9 @@
           return Promise.resolve();
         },
       },
+      // No-op stub — the popup isn't open during mock sessions, so onChanged
+      // never needs to fire. The addListener call must exist to prevent a crash.
+      onChanged: { addListener: () => {} },
     },
 
     scripting: {},
