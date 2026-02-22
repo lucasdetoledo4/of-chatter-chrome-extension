@@ -79,14 +79,12 @@ const STYLES = `
 
   /* ── Panel shell ───────────────────────────────────────── */
   #ofc-panel {
-    background: #0e0e14;
-    border: 1px solid #21212e;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     overflow: hidden;
     margin: 8px 0;
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     width: 100%;
     min-width: 320px;
     max-width: 560px;
@@ -98,8 +96,8 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
     padding: 8px 8px 8px 12px;
-    background: #13131d;
-    border-bottom: 1px solid #21212e;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
     gap: 8px;
     user-select: none;
   }
@@ -124,14 +122,14 @@ const STYLES = `
     font-weight: 700;
     letter-spacing: 0.09em;
     text-transform: uppercase;
-    color: #5a5a7a;
+    color: #475569;
     white-space: nowrap;
   }
 
   #ofc-count {
     font-size: 10px;
     font-weight: 400;
-    color: #52526e;
+    color: #94a3b8;
     letter-spacing: 0;
     text-transform: none;
     white-space: nowrap;
@@ -147,7 +145,7 @@ const STYLES = `
   .ofc-hbtn {
     background: none;
     border: none;
-    color: #52527a;
+    color: #94a3b8;
     cursor: pointer;
     padding: 5px;
     border-radius: 7px;
@@ -159,8 +157,8 @@ const STYLES = `
   }
 
   .ofc-hbtn:hover {
-    color: #7878a8;
-    background: #1c1c2a;
+    color: #475569;
+    background: #f1f5f9;
   }
 
   #ofc-regen.spinning svg {
@@ -187,13 +185,13 @@ const STYLES = `
     border: 1px solid transparent;
     cursor: pointer;
     background: none;
-    color: #58587a;
+    color: #94a3b8;
     transition: color 0.12s, background 0.12s, border-color 0.12s;
     white-space: nowrap;
     font-family: inherit;
   }
 
-  .ofc-mode-btn:hover { color: #8080a8; }
+  .ofc-mode-btn:hover { color: #64748b; }
 
   .ofc-mode-btn[data-mode="warm_up"].active {
     color: #34d399;
@@ -230,14 +228,14 @@ const STYLES = `
     align-items: center;
     gap: 10px;
     padding: 13px 14px;
-    color: #404058;
+    color: #64748b;
     font-size: 12px;
   }
 
   .ofc-spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid #1e1e2c;
+    border: 2px solid #e2e8f0;
     border-top-color: #7c3aed;
     border-radius: 50%;
     animation: ofc-spin 0.7s linear infinite;
@@ -252,7 +250,7 @@ const STYLES = `
     align-items: flex-start;
     gap: 8px;
     padding: 12px 14px;
-    color: #f87171;
+    color: #dc2626;
     font-size: 12px;
     line-height: 1.55;
   }
@@ -261,7 +259,7 @@ const STYLES = `
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #f87171;
+    background: #dc2626;
     flex-shrink: 0;
     margin-top: 4px;
   }
@@ -275,7 +273,7 @@ const STYLES = `
   .ofc-card {
     display: flex;
     align-items: stretch;
-    border-top: 1px solid #18181f;
+    border-top: 1px solid #e2e8f0;
     cursor: pointer;
     transition: background 0.12s;
     animation: ofc-fadein 0.2s ease both;
@@ -295,7 +293,7 @@ const STYLES = `
   }
 
   .ofc-card:hover {
-    background: #131320;
+    background: #f1f5f9;
   }
 
   .ofc-accent-bar {
@@ -332,7 +330,7 @@ const STYLES = `
   .ofc-use-btn {
     font-size: 11px;
     font-weight: 500;
-    color: #38385a;
+    color: #94a3b8;
     background: none;
     border: 1px solid transparent;
     border-radius: 6px;
@@ -354,15 +352,15 @@ const STYLES = `
   .ofc-card:hover .ofc-use-btn {
     opacity: 1;
     pointer-events: auto;
-    color: #6868a8;
-    border-color: #28283c;
-    background: #19192a;
+    color: #475569;
+    border-color: #e2e8f0;
+    background: #f1f5f9;
   }
 
   .ofc-use-btn:hover {
-    color: #a78bfa;
-    background: rgba(139, 92, 246, 0.14);
-    border-color: rgba(139, 92, 246, 0.28);
+    color: #7c3aed;
+    background: rgba(124, 58, 237, 0.08);
+    border-color: rgba(124, 58, 237, 0.2);
   }
 
   .ofc-use-btn.done {
@@ -376,9 +374,9 @@ const STYLES = `
   /* ── Keyboard shortcut hints ─────────────────────── */
   .ofc-kbd {
     font-size: 9px;
-    color: #252538;
-    background: #131320;
-    border: 1px solid #232338;
+    color: #94a3b8;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
     border-radius: 3px;
     padding: 1px 5px;
     font-family: ui-monospace, monospace;
@@ -386,17 +384,17 @@ const STYLES = `
     flex-shrink: 0;
     transition: color 0.12s;
   }
-  .ofc-card:hover .ofc-kbd { color: #3a3a58; }
+  .ofc-card:hover .ofc-kbd { color: #475569; }
 
   .ofc-text {
-    color: #9898b8;
+    color: #334155;
     font-size: 13px;
     line-height: 1.5;
     word-break: break-word;
   }
 
   .ofc-card:hover .ofc-text {
-    color: #b0b0cc;
+    color: #0f172a;
   }
 
   /* ── Fan context strip ──────────────────────────────── */
@@ -405,8 +403,8 @@ const STYLES = `
     align-items: center;
     gap: 6px;
     padding: 5px 12px;
-    background: #0b0b11;
-    border-bottom: 1px solid #18181f;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
     font-size: 11px;
     flex-wrap: wrap;
   }
@@ -418,9 +416,9 @@ const STYLES = `
     letter-spacing: 0.01em;
   }
 
-  .ofc-ctx-sep { color: #363650; }
+  .ofc-ctx-sep { color: #cbd5e1; }
 
-  .ofc-ctx-dur { color: #525272; }
+  .ofc-ctx-dur { color: #94a3b8; }
 
   .ofc-ctx-tag {
     font-size: 9px;
@@ -429,15 +427,15 @@ const STYLES = `
     text-transform: uppercase;
     padding: 1px 6px;
     border-radius: 100px;
-    background: rgba(255, 255, 255, 0.04);
-    color: #383858;
+    background: rgba(0, 0, 0, 0.05);
+    color: #64748b;
   }
 
   /* ── Notes ──────────────────────────────────────────── */
   #ofc-notes {
     padding: 6px 10px 8px;
-    background: #0b0b11;
-    border-top: 1px solid #18181f;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
     position: relative;
   }
 
@@ -449,16 +447,16 @@ const STYLES = `
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #424260;
+    color: #94a3b8;
     margin-bottom: 4px;
   }
 
   .ofc-notes-ta {
     width: 100%;
-    background: #0e0e18;
-    border: 1px solid #1e1e2c;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
     border-radius: 6px;
-    color: #6868a0;
+    color: #475569;
     font-size: 12px;
     font-family: inherit;
     line-height: 1.5;
@@ -470,11 +468,11 @@ const STYLES = `
     transition: border-color 0.15s, color 0.15s;
   }
 
-  .ofc-notes-ta::placeholder { color: #252538; }
+  .ofc-notes-ta::placeholder { color: #cbd5e1; }
 
   .ofc-notes-ta:focus {
-    border-color: #2e2e4a;
-    color: #9090c0;
+    border-color: #7c3aed;
+    color: #0f172a;
   }
 
   .ofc-notes-saved {
@@ -509,8 +507,8 @@ function escapeHtml(text: string): string {
 // ─── Fan context helpers ──────────────────────────────────────────────────────
 
 function spendColor(value: number): string {
-  if (value === 0) return '#3a3a58';
-  if (value < 50) return '#5a5a88';
+  if (value === 0) return '#94a3b8';
+  if (value < 50) return '#64748b';
   if (value < 200) return '#d97706';
   return '#10b981';
 }
