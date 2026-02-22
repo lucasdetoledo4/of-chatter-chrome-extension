@@ -3,6 +3,7 @@ import type {
   FanProfile,
   CreatorPersona,
   CreatorProfile,
+  CreatorAccount,
   BackgroundResponse,
   GetSuggestionsRequest,
   AnalyzeCreatorStyleRequest,
@@ -11,7 +12,7 @@ import type {
 } from '../types/index';
 import { observeChat, scrapeConversationHistory, findChatContainer, scrapeFanName } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
-import { upsertFanProfile, getFanProfile, getCreatorProfile, upsertCreatorProfile } from '../utils/storage';
+import { upsertFanProfile, getFanProfile, getCreatorProfile, upsertCreatorProfile, getCreators, upsertCreatorAccount } from '../utils/storage';
 import { CREATOR_PRESETS, pickVariationHint } from '../utils/prompt-builder';
 import { scrapeCreatorProfile, scrapeCreatorFromNav, diagnoseProfileScraper } from './profile-scraper';
 
@@ -33,11 +34,14 @@ const w = window as typeof window & {
   __OFC_MOCK_ANCHOR_ID__?: string;
 };
 
-// Cached creator type — loaded from chrome.storage.sync on init
+// Cached creator state — loaded from chrome.storage.sync on init
+let cachedCreatorId: string = 'default';
 let cachedCreatorType: CreatorType = 'woman';
-
-// Cached creator profile — loaded from chrome.storage.local on init
 let cachedCreatorProfile: CreatorProfile | null = null;
+
+// Module-level refs so the storage change listener can update the active overlay
+let overlay: UIOverlay | null = null;
+let lastRequest: GetSuggestionsRequest | null = null;
 
 // Default persona — uses cached creator type set by popup
 function getActivePersona(): CreatorPersona {
@@ -48,19 +52,82 @@ function getActivePersona(): CreatorPersona {
   return { ...CREATOR_PRESETS[cachedCreatorType], name: cachedCreatorProfile?.displayName || CREATOR_PRESETS[cachedCreatorType].name };
 }
 
+/**
+ * Infer a creator persona type from their bio + display name using keyword heuristics.
+ * This is a best-effort starting point — chatters always override in the popup.
+ */
+function inferPersonaType(bio: string, displayName: string): CreatorType {
+  const text = `${bio} ${displayName}`.toLowerCase();
+  if (/\bcouple\b|husband|wife|\bwe \b/.test(text)) return 'couple';
+  if (/egirl|e-girl|\bgamer\b|streamer|anime|cosplay|kawaii/.test(text)) return 'egirl';
+  if (/mature|milf|\bmom\b|\bmother\b|cougar/.test(text)) return 'mature_woman';
+  if (/\bguy\b|\bman\b|\bmale\b|daddy|muscl|gym\b/.test(text)) return 'man';
+  if (/\bvideo\b.*custom|\bcustom.*clips\b/.test(text)) return 'video_creator';
+  if (/photos? only|pics only|picture sets?|photo sets?/.test(text)) return 'picture_only';
+  return 'woman';
+}
+
 async function loadCreatorState(): Promise<void> {
-  // Load creator type from sync storage (set by popup)
-  const syncResult = await chrome.storage.sync.get('CREATOR_TYPE');
-  const savedType = syncResult.CREATOR_TYPE as CreatorType | undefined;
-  if (savedType && savedType in CREATOR_PRESETS) {
-    cachedCreatorType = savedType;
+  const syncData = await chrome.storage.sync.get(['ACTIVE_CREATOR_ID', 'CREATORS', 'CREATOR_TYPE']);
+  let creators: CreatorAccount[] = (syncData['CREATORS'] as CreatorAccount[]) ?? [];
+
+  // Migration: seed from logged-in OF profile if no CREATORS yet
+  if (creators.length === 0) {
+    // Start with legacy type if set, otherwise detect from existing profile bio
+    let seedType: CreatorType = (syncData['CREATOR_TYPE'] as CreatorType) ?? 'woman';
+
+    // Auto-detect display name from the sidebar nav
+    let seedName = 'Creator 1';
+    try {
+      const nav = scrapeCreatorFromNav();
+      if (nav?.displayName) seedName = nav.displayName;
+    } catch { /* ignore scraping errors on non-OF pages */ }
+
+    // Refine persona type from bio if a profile was previously stored
+    try {
+      const existingProfile = await getCreatorProfile('default');
+      if (existingProfile?.bio) {
+        seedType = inferPersonaType(existingProfile.bio, seedName);
+      }
+    } catch { /* ignore */ }
+
+    const seed: CreatorAccount = {
+      id: 'default',
+      name: seedName,
+      type: seedType,
+      createdAt: new Date().toISOString(),
+    };
+    creators = [seed];
+    await chrome.storage.sync.set({ CREATORS: creators, ACTIVE_CREATOR_ID: 'default' });
+    console.log(`[OFC] Creator auto-detected: "${seedName}" / ${seedType}`);
   }
 
-  // Load creator profile from local storage
-  cachedCreatorProfile = await getCreatorProfile('self');
+  const activeId = (syncData['ACTIVE_CREATOR_ID'] as string) ?? creators[0]!.id;
+  const active = creators.find((c) => c.id === activeId) ?? creators[0]!;
+  cachedCreatorId = active.id;
+  cachedCreatorType = active.type;
+  cachedCreatorProfile = await getCreatorProfile(cachedCreatorId);
 }
 
 const STYLE_REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+// ─── Creator Switch Listener ───────────────────────────────────────────────────
+
+// Reacts to popup changes (ACTIVE_CREATOR_ID or CREATORS) without requiring a page reload.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'sync') return;
+  if (!('ACTIVE_CREATOR_ID' in changes || 'CREATORS' in changes)) return;
+  void loadCreatorState().then(async () => {
+    const creators = await getCreators();
+    overlay?.setCreators(creators, cachedCreatorId);
+    if (lastRequest) {
+      const req = { ...lastRequest, creatorPersona: getActivePersona(), creatorProfile: cachedCreatorProfile ?? undefined };
+      lastRequest = req;
+      overlay?.showLoading();
+      void fireSuggestionsRequest(req, overlay!);
+    }
+  });
+});
 
 /** Fire-and-forget style analysis when we have enough real messages. */
 function triggerStyleAnalysisIfNeeded(creatorRealMessages: string[]): void {
@@ -81,7 +148,7 @@ function triggerStyleAnalysisIfNeeded(creatorRealMessages: string[]): void {
   chrome.runtime.sendMessage<AnalyzeCreatorStyleRequest, BackgroundResponse>(req)
     .then(async (resp) => {
       if (resp.success && resp.writingStyle) {
-        cachedCreatorProfile = await upsertCreatorProfile('self', {
+        cachedCreatorProfile = await upsertCreatorProfile(cachedCreatorId, {
           writingStyle: resp.writingStyle,
           styleAnalyzedAt: new Date().toISOString(),
         });
@@ -326,6 +393,8 @@ let activeSuggestionMode: SuggestionMode = 'sell';
 // Incremented on every new suggestion request. Responses from superseded
 // requests are discarded, preventing races when fan messages arrive fast.
 let _suggestionGeneration = 0;
+// Track the current fanId for re-trigger after creator switch
+let _activeFanId: string | null = null;
 
 async function initializeChatAssistant(): Promise<void> {
   // Tear down previous instance before starting fresh.
@@ -336,13 +405,15 @@ async function initializeChatAssistant(): Promise<void> {
   _activeStopObserver?.();
   _activeStopObserver = null;
   _suggestionGeneration = 0; // prevent stale gen values across re-navigations
+  lastRequest = null;
 
   const fanId = extractFanIdFromUrl(location.pathname);
   if (!fanId) return;
+  _activeFanId = fanId;
 
   console.log(`[OFC] Chat assistant initializing for fan: ${fanId}`);
 
-  // Load creator type (popup setting) and cached creator profile
+  // Load creator state (multi-creator) and cached creator profile
   await loadCreatorState();
 
   // Restore persisted suggestion mode (survives page reloads and extension updates)
@@ -358,25 +429,31 @@ async function initializeChatAssistant(): Promise<void> {
   const chatPartnerName = scrapeFanName();
   const navCreator = scrapeCreatorFromNav();
   if (navCreator && navCreator.displayName !== chatPartnerName) {
-    cachedCreatorProfile = await upsertCreatorProfile('self', { displayName: navCreator.displayName });
+    cachedCreatorProfile = await upsertCreatorProfile(cachedCreatorId, { displayName: navCreator.displayName });
     console.log(`[OFC] Creator name from nav: "${navCreator.displayName}"`);
+
+    // Sync the scraped name into the creator account so the panel header reflects it.
+    // Only update when the account name is still the migration default ("Creator 1").
+    const creators = await getCreators();
+    const creator = creators.find((c) => c.id === cachedCreatorId);
+    if (creator && creator.name === 'Creator 1') {
+      await upsertCreatorAccount({ ...creator, name: navCreator.displayName });
+    }
   } else if (navCreator) {
     console.warn(`[OFC] Nav selector returned chat partner's name ("${navCreator.displayName}") — skipping to avoid overwriting creator identity.`);
   }
 
-  const overlay = new UIOverlay();
+  overlay = new UIOverlay();
   overlay.setMode(activeSuggestionMode); // apply persisted mode before first inject
   overlay.setInsertHandler(insertIntoChat);
   overlay.setNotesSaveHandler((notes) => { void upsertFanProfile(fanId, { notes }); });
 
-  // Last request is stored so regenerate can replay it
-  let lastRequest: GetSuggestionsRequest | null = null;
   overlay.setRegenerateHandler(() => {
     if (lastRequest) {
-      overlay.showRegenLoading();
+      overlay!.showRegenLoading();
       void fireSuggestionsRequest(
         { ...lastRequest, variationHint: pickVariationHint() },
-        overlay
+        overlay!
       );
     }
   });
@@ -387,20 +464,30 @@ async function initializeChatAssistant(): Promise<void> {
     if (lastRequest) {
       const req = { ...lastRequest, mode };
       lastRequest = req;          // keep regen in sync with current mode
-      overlay.showLoading();
-      void fireSuggestionsRequest(req, overlay);
+      overlay!.showLoading();
+      void fireSuggestionsRequest(req, overlay!);
     }
   });
+
+  // Wire creator switcher — sets ACTIVE_CREATOR_ID, which triggers the onChanged
+  // listener to reload state and re-fire suggestions
+  overlay.setCreatorSwitchHandler(async (id) => {
+    await chrome.storage.sync.set({ ACTIVE_CREATOR_ID: id });
+  });
+
+  // Pass initial creator list to the overlay
+  const creators = await getCreators();
+  overlay.setCreators(creators, cachedCreatorId);
 
   // Retry injection — OF Vue app may not have rendered the anchor yet
   let attempts = 0;
   const tryInject = (): void => {
-    if (overlay.isAttached()) return;
+    if (overlay!.isAttached()) return;
 
     const { el: anchor, pos } = findAnchorElement();
-    overlay.inject(anchor, pos);
+    overlay!.inject(anchor, pos);
 
-    if (overlay.isAttached()) {
+    if (overlay!.isAttached()) {
       console.log('[OFC] Chat assistant initialized.');
       startObserver();
     } else if (attempts < INJECT_RETRY_LIMIT) {
@@ -428,7 +515,7 @@ async function initializeChatAssistant(): Promise<void> {
     }
     observerAttempts = 0;
     _activeStopObserver = observeChat((msg) => {
-      void handleNewMessage(msg, fanId, overlay, (req) => { lastRequest = req; });
+      void handleNewMessage(msg, fanId, overlay!, (req) => { lastRequest = req; });
     });
   };
 
@@ -437,7 +524,7 @@ async function initializeChatAssistant(): Promise<void> {
   // Host-guard: React may unmount and recreate DOM nodes, wiping the injected panel.
   // Re-inject whenever the panel disappears from the document.
   const hostGuard = new MutationObserver(() => {
-    if (!overlay.isAttached()) {
+    if (!overlay?.isAttached()) {
       console.log('[OFC] Panel removed by React — re-injecting.');
       attempts = 0;
       tryInject();
@@ -466,14 +553,37 @@ const navObserver = new MutationObserver(() => {
       // Opportunistically scrape creator profile data on profile pages
       const scraped = scrapeCreatorProfile();
       if (scraped) {
-        void upsertCreatorProfile('self', {
+        void upsertCreatorProfile(cachedCreatorId, {
           displayName: scraped.displayName,
           bio: scraped.bio,
           profilePhotoUrl: scraped.profilePhotoUrl,
           recentCaptions: scraped.recentCaptions,
           scrapedAt: new Date().toISOString(),
-        }).then((profile) => {
+        }).then(async (profile) => {
           cachedCreatorProfile = profile;
+
+          // Auto-update the creator account name + persona type from the scraped profile.
+          // This refines the migration default without overriding manual popup edits —
+          // we only update the name/type when the scraped values differ from what's stored.
+          if (profile.bio) {
+            const creators = await getCreators();
+            const creator = creators.find((c) => c.id === cachedCreatorId);
+            if (creator) {
+              const inferredType = inferPersonaType(profile.bio, profile.displayName);
+              const nameChanged = profile.displayName && profile.displayName !== creator.name;
+              const typeChanged = inferredType !== creator.type && creator.type === 'woman'; // only auto-update from the default
+              if (nameChanged || typeChanged) {
+                const updated: CreatorAccount = {
+                  ...creator,
+                  name: profile.displayName || creator.name,
+                  type: typeChanged ? inferredType : creator.type,
+                };
+                await upsertCreatorAccount(updated);
+                console.log(`[OFC] Creator account updated from profile: name="${updated.name}" type="${updated.type}"`);
+                // onChanged fires → overlay creator name + panel update
+              }
+            }
+          }
         });
       }
     }
@@ -620,8 +730,8 @@ window.addEventListener('message', (e: MessageEvent) => {
 
   // Creator profile
   console.group('Creator profile (stored)');
-  chrome.storage.local.get('creator:self')
-    .then((r) => console.log('[OFC] stored creator:self:', r['creator:self'] ?? 'nothing stored yet'))
+  chrome.storage.local.get(`creator:${cachedCreatorId}`)
+    .then((r) => console.log(`[OFC] stored creator:${cachedCreatorId}:`, r[`creator:${cachedCreatorId}`] ?? 'nothing stored yet'))
     .catch(() => {});
   console.groupEnd();
 

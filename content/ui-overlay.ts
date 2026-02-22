@@ -1,4 +1,4 @@
-import type { Suggestion, SuggestionType, SuggestionMode, FanProfile } from '../types/index';
+import type { Suggestion, SuggestionType, SuggestionMode, FanProfile, CreatorAccount } from '../types/index';
 
 const HOST_ID = 'ofc-suggestion-host';
 
@@ -90,16 +90,21 @@ const STYLES = `
     max-width: 560px;
   }
 
+  .ofc-hidden { display: none !important; }
+
   /* ── Header ─────────────────────────────────────────────── */
   #ofc-header {
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    user-select: none;
+  }
+
+  #ofc-header-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 8px 8px 8px 12px;
-    background: #fff;
-    border-bottom: 1px solid #e2e8f0;
     gap: 8px;
-    user-select: none;
   }
 
   #ofc-title {
@@ -117,13 +122,67 @@ const STYLES = `
     align-items: center;
   }
 
-  #ofc-label {
+  /* ── Creator switcher button ─────────────────────────────── */
+  .ofc-creator-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: background 0.12s;
+    font-family: inherit;
+    color: #475569;
+  }
+
+  .ofc-creator-btn:hover { background: #f1f5f9; }
+
+  #ofc-creator-name {
     font-size: 10.5px;
     font-weight: 700;
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: #475569;
     white-space: nowrap;
+  }
+
+  .ofc-creator-chevron {
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    line-height: 0;
+  }
+
+  /* ── Creator dropdown ────────────────────────────────────── */
+  .ofc-creator-drop {
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .ofc-creator-row {
+    padding: 9px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.1s;
+    color: #475569;
+  }
+
+  .ofc-creator-row:hover { background: #f8fafc; }
+
+  .ofc-creator-row.active {
+    color: #7c3aed;
+    font-weight: 600;
+  }
+
+  .ofc-creator-check {
+    font-size: 11px;
+    color: #7c3aed;
   }
 
   #ofc-count {
@@ -537,10 +596,16 @@ export class UIOverlay {
   private regenerateHandler: (() => void) | null = null;
   private notesSaveHandler: ((notes: string) => void) | null = null;
   private modeChangeHandler: ((mode: SuggestionMode) => void) | null = null;
+  private creatorSwitchHandler: ((id: string) => void) | null = null;
   private activeMode: SuggestionMode = 'sell';
   private lastSavedNotes = '';
   private collapsed = false;
   private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private _docClickHandler: (() => void) | null = null;
+  private _creators: CreatorAccount[] = [];
+  private _activeCreatorId: string = '';
+  private _dropOpen = false;
+  private _justToggledDrop = false;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
@@ -556,6 +621,16 @@ export class UIOverlay {
 
   setNotesSaveHandler(fn: (notes: string) => void): void {
     this.notesSaveHandler = fn;
+  }
+
+  setCreatorSwitchHandler(fn: (id: string) => void): void {
+    this.creatorSwitchHandler = fn;
+  }
+
+  setCreators(creators: CreatorAccount[], activeId: string): void {
+    this._creators = creators;
+    this._activeCreatorId = activeId;
+    this._syncCreatorBtn();
   }
 
   /** Set the active mode — updates internal state and syncs button classes if injected. */
@@ -595,24 +670,30 @@ export class UIOverlay {
     const header = document.createElement('div');
     header.id = 'ofc-header';
     header.innerHTML = `
-      <div id="ofc-title">
-        <span class="ofc-logo">${ICON_SPARKLE}</span>
-        <span id="ofc-label">AI Suggestions</span>
-        <span id="ofc-count"></span>
+      <div id="ofc-header-row">
+        <div id="ofc-title">
+          <span class="ofc-logo">${ICON_SPARKLE}</span>
+          <button id="ofc-creator-btn" class="ofc-creator-btn" title="Switch creator">
+            <span id="ofc-creator-name">···</span>
+            <span class="ofc-creator-chevron">${ICON_CHEVRON_DOWN}</span>
+          </button>
+          <span id="ofc-count"></span>
+        </div>
+        <div id="ofc-modes">
+          <button class="ofc-mode-btn${this.activeMode === 'warm_up' ? ' active' : ''}" data-mode="warm_up">Warm</button>
+          <button class="ofc-mode-btn${this.activeMode === 'sell' ? ' active' : ''}" data-mode="sell">Sell</button>
+          <button class="ofc-mode-btn${this.activeMode === 're_engage' ? ' active' : ''}" data-mode="re_engage">Re-engage</button>
+        </div>
+        <div id="ofc-actions">
+          <button id="ofc-regen" class="ofc-hbtn" title="Regenerate (Alt+R)" style="display:none">
+            ${ICON_REGEN}
+          </button>
+          <button id="ofc-collapse" class="ofc-hbtn" title="Collapse panel">
+            ${ICON_CHEVRON_UP}
+          </button>
+        </div>
       </div>
-      <div id="ofc-modes">
-        <button class="ofc-mode-btn${this.activeMode === 'warm_up' ? ' active' : ''}" data-mode="warm_up">Warm</button>
-        <button class="ofc-mode-btn${this.activeMode === 'sell' ? ' active' : ''}" data-mode="sell">Sell</button>
-        <button class="ofc-mode-btn${this.activeMode === 're_engage' ? ' active' : ''}" data-mode="re_engage">Re-engage</button>
-      </div>
-      <div id="ofc-actions">
-        <button id="ofc-regen" class="ofc-hbtn" title="Regenerate (Alt+R)" style="display:none">
-          ${ICON_REGEN}
-        </button>
-        <button id="ofc-collapse" class="ofc-hbtn" title="Collapse panel">
-          ${ICON_CHEVRON_UP}
-        </button>
-      </div>
+      <div id="ofc-creator-drop" class="ofc-creator-drop ofc-hidden"></div>
     `;
 
     // ── Body ────────────────────────────────────────────────
@@ -673,6 +754,33 @@ export class UIOverlay {
       });
     });
 
+    // Wire creator switcher button
+    const creatorBtn = header.querySelector<HTMLButtonElement>('#ofc-creator-btn')!;
+    const creatorDrop = header.querySelector<HTMLElement>('#ofc-creator-drop')!;
+    creatorBtn.addEventListener('click', () => {
+      this._justToggledDrop = true;
+      setTimeout(() => { this._justToggledDrop = false; }, 10);
+      this._dropOpen = !this._dropOpen;
+      creatorDrop.classList.toggle('ofc-hidden', !this._dropOpen);
+      const chevron = creatorBtn.querySelector<HTMLElement>('.ofc-creator-chevron');
+      if (chevron) chevron.innerHTML = this._dropOpen ? ICON_CHEVRON_UP : ICON_CHEVRON_DOWN;
+    });
+
+    // Close dropdown when clicking outside the panel
+    if (this._docClickHandler) {
+      document.removeEventListener('click', this._docClickHandler);
+    }
+    const docClickHandler = (): void => {
+      if (this._dropOpen && !this._justToggledDrop) {
+        this._dropOpen = false;
+        creatorDrop.classList.add('ofc-hidden');
+        const chevron = creatorBtn.querySelector<HTMLElement>('.ofc-creator-chevron');
+        if (chevron) chevron.innerHTML = ICON_CHEVRON_DOWN;
+      }
+    };
+    document.addEventListener('click', docClickHandler);
+    this._docClickHandler = docClickHandler;
+
     // Keyboard shortcuts — Alt+1/2/3 inserts suggestion, Alt+R regens
     // Remove any previous listener first (handles re-injection after React removes the panel)
     if (this._keydownHandler) {
@@ -687,6 +795,9 @@ export class UIOverlay {
     };
     document.addEventListener('keydown', keydownHandler);
     this._keydownHandler = keydownHandler;
+
+    // Apply any creator data that was set before the shadow DOM existed
+    this._syncCreatorBtn();
   }
 
   isAttached(): boolean {
@@ -829,6 +940,10 @@ export class UIOverlay {
       document.removeEventListener('keydown', this._keydownHandler);
       this._keydownHandler = null;
     }
+    if (this._docClickHandler) {
+      document.removeEventListener('click', this._docClickHandler);
+      this._docClickHandler = null;
+    }
     this.host?.remove();
     this.host = null;
     this.shadow = null;
@@ -836,6 +951,43 @@ export class UIOverlay {
   }
 
   // ─── Private ──────────────────────────────────────────────
+
+  private _syncCreatorBtn(): void {
+    const nameEl = this.shadow?.querySelector<HTMLElement>('#ofc-creator-name');
+    const active = this._creators.find((c) => c.id === this._activeCreatorId) ?? this._creators[0];
+    if (nameEl) {
+      nameEl.textContent = active ? active.name.toUpperCase() : '···';
+    }
+
+    const drop = this.shadow?.querySelector<HTMLElement>('#ofc-creator-drop');
+    if (!drop) return;
+
+    // Only show the switcher button if there are multiple creators
+    const creatorBtn = this.shadow?.querySelector<HTMLElement>('#ofc-creator-btn');
+    if (creatorBtn) {
+      creatorBtn.style.display = this._creators.length > 1 ? '' : 'none';
+    }
+
+    drop.innerHTML = this._creators.map((c) => `
+      <div class="ofc-creator-row${c.id === this._activeCreatorId ? ' active' : ''}" data-creator-id="${escapeHtml(c.id)}">
+        <span>${escapeHtml(c.name)}</span>
+        ${c.id === this._activeCreatorId ? '<span class="ofc-creator-check">✓</span>' : ''}
+      </div>
+    `).join('');
+
+    drop.querySelectorAll<HTMLElement>('.ofc-creator-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const id = row.dataset['creatorId'];
+        if (!id || id === this._activeCreatorId) return;
+        // Close the dropdown immediately
+        this._dropOpen = false;
+        drop.classList.add('ofc-hidden');
+        const chevron = this.shadow?.querySelector<HTMLElement>('.ofc-creator-chevron');
+        if (chevron) chevron.innerHTML = ICON_CHEVRON_DOWN;
+        this.creatorSwitchHandler?.(id);
+      });
+    });
+  }
 
   /** Insert the suggestion card at the given zero-based index via keyboard shortcut. */
   private insertCard(index: number): void {
