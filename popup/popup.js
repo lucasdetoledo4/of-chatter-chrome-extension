@@ -20,7 +20,10 @@ let activeCreatorId = '';
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
-chrome.storage.sync.get(['ANTHROPIC_API_KEY', 'CREATORS', 'ACTIVE_CREATOR_ID', 'CREATOR_TYPE'], (data) => {
+// Placeholder names from old seeding logic — removed on load.
+const LEGACY_PLACEHOLDER_RE = /^(Creator \d+|New Creator)$/;
+
+chrome.storage.sync.get(['ANTHROPIC_API_KEY', 'CREATORS', 'ACTIVE_CREATOR_ID'], (data) => {
   // API key display
   if (data.ANTHROPIC_API_KEY) {
     const last4 = data.ANTHROPIC_API_KEY.slice(-4);
@@ -28,17 +31,11 @@ chrome.storage.sync.get(['ANTHROPIC_API_KEY', 'CREATORS', 'ACTIVE_CREATOR_ID', '
     setKeyStatus(true, `Key saved  ···${last4}`);
   }
 
-  // Migration: seed from legacy CREATOR_TYPE if no CREATORS yet
-  if (!data.CREATORS || data.CREATORS.length === 0) {
-    const legacyType = data.CREATOR_TYPE || 'woman';
-    const seed = { id: 'default', name: 'Creator 1', type: legacyType, createdAt: new Date().toISOString() };
-    creators = [seed];
-    activeCreatorId = 'default';
-    saveCreatorState();
-  } else {
-    creators = data.CREATORS;
-    activeCreatorId = data.ACTIVE_CREATOR_ID || creators[0].id;
-  }
+  // Load creators, stripping any legacy placeholder names.
+  const raw = data.CREATORS || [];
+  creators = raw.filter((c) => !LEGACY_PLACEHOLDER_RE.test(c.name));
+  if (creators.length !== raw.length) saveCreatorState(); // persist cleanup
+  activeCreatorId = creators.find((c) => c.id === data.ACTIVE_CREATOR_ID)?.id ?? creators[0]?.id ?? '';
 
   renderCreatorList();
   syncEditFields();
@@ -48,6 +45,12 @@ chrome.storage.sync.get(['ANTHROPIC_API_KEY', 'CREATORS', 'ACTIVE_CREATOR_ID', '
 
 function renderCreatorList() {
   creatorListEl.innerHTML = '';
+
+  if (creators.length === 0) {
+    creatorListEl.innerHTML = '<div class="creator-empty">Open OnlyFans to auto-detect creators</div>';
+    return;
+  }
+
   creators.forEach((c) => {
     const row = document.createElement('div');
     row.className = `creator-row${c.id === activeCreatorId ? ' active' : ''}`;
@@ -86,7 +89,12 @@ function renderCreatorList() {
 
 function syncEditFields() {
   const active = creators.find((c) => c.id === activeCreatorId);
-  if (!active) return;
+  const editSection = document.getElementById('editSection');
+  if (!active) {
+    editSection.style.display = 'none';
+    return;
+  }
+  editSection.style.display = '';
   creatorNameInput.value = active.name;
   creatorTypeSelect.value = active.type;
 }
@@ -120,23 +128,24 @@ addCreatorBtn.addEventListener('click', () => {
 
 saveBtn.addEventListener('click', () => {
   const key = apiKeyInput.value.trim();
-  const newName = creatorNameInput.value.trim();
-  const newType = creatorTypeSelect.value;
 
   if (key && !key.startsWith('sk-ant-')) {
     showStatus('Key must start with sk-ant-', 'error');
     return;
   }
 
-  if (!newName) {
-    showStatus('Creator name cannot be empty', 'error');
-    return;
-  }
-
-  // Update active creator's name + type
-  const idx = creators.findIndex((c) => c.id === activeCreatorId);
-  if (idx >= 0) {
-    creators[idx] = { ...creators[idx], name: newName, type: newType };
+  // Update active creator's name + type only when one is selected.
+  const active = creators.find((c) => c.id === activeCreatorId);
+  if (active) {
+    const newName = creatorNameInput.value.trim();
+    if (!newName) {
+      showStatus('Creator name cannot be empty', 'error');
+      return;
+    }
+    const idx = creators.findIndex((c) => c.id === activeCreatorId);
+    if (idx >= 0) {
+      creators[idx] = { ...creators[idx], name: newName, type: creatorTypeSelect.value };
+    }
   }
 
   const toSave = { CREATORS: creators, ACTIVE_CREATOR_ID: activeCreatorId };
@@ -149,7 +158,7 @@ saveBtn.addEventListener('click', () => {
       apiKeyInput.placeholder = `••••••••••${last4}`;
       setKeyStatus(true, `Key saved  ···${last4}`);
     }
-    renderCreatorList();
+    if (active) renderCreatorList();
     showStatus('Saved', 'ok');
   });
 });
