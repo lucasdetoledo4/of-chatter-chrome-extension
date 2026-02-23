@@ -21,12 +21,8 @@ export interface ScrapedProfile {
 function queryFirst(selectors: string[]): Element | null {
   for (const sel of selectors) {
     const el = document.querySelector(sel);
-    if (el) {
-      console.log(`[OFC] profile-scraper: resolved "${sel}"`);
-      return el;
-    }
+    if (el) return el;
   }
-  console.log(`[OFC] profile-scraper: none resolved from [${selectors.join(', ')}]`);
   return null;
 }
 
@@ -58,10 +54,7 @@ export function scrapeCreatorProfile(): ScrapedProfile | null {
   const displayName = textOf(nameEl);
 
   // Bail out if we can't even find a name — probably not a profile page
-  if (!displayName) {
-    console.log('[OFC] profile-scraper: no display name found — skipping scrape');
-    return null;
-  }
+  if (!displayName) return null;
 
   // ── Bio ─────────────────────────────────────────────────────────────────────
   const bioEl = queryFirst([
