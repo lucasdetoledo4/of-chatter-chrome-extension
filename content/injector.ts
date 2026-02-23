@@ -80,45 +80,34 @@ function inferPersonaType(bio: string, displayName: string): CreatorType {
   return 'woman';
 }
 
+// Names produced by old placeholder seeding — purged on first load after this version.
+const LEGACY_PLACEHOLDER_RE = /^(Creator \d+|New Creator)$/;
+
 async function loadCreatorState(): Promise<void> {
-  const syncData = await chrome.storage.sync.get(['ACTIVE_CREATOR_ID', 'CREATORS', 'CREATOR_TYPE']);
+  const syncData = await chrome.storage.sync.get(['ACTIVE_CREATOR_ID', 'CREATORS']);
   let creators: CreatorAccount[] = (syncData['CREATORS'] as CreatorAccount[]) ?? [];
 
-  // Migration: seed from logged-in OF profile if no CREATORS yet
+  // One-time migration: strip any placeholder names left by old seeding logic.
+  // Creators are now auto-detected from OF nav — no placeholders are ever created.
+  const cleaned = creators.filter((c) => !LEGACY_PLACEHOLDER_RE.test(c.name));
+  if (cleaned.length !== creators.length) {
+    creators = cleaned;
+    await chrome.storage.sync.set({ CREATORS: creators });
+    console.log('[OFC] Removed legacy placeholder creators.');
+  }
+
   if (creators.length === 0) {
-    // Start with legacy type if set, otherwise detect from existing profile bio
-    let seedType: CreatorType = (syncData['CREATOR_TYPE'] as CreatorType) ?? 'woman';
-
-    // Auto-detect display name from the sidebar nav
-    let seedName = 'Creator 1';
-    try {
-      const nav = scrapeCreatorFromNav();
-      if (nav?.displayName) seedName = nav.displayName;
-    } catch { /* ignore scraping errors on non-OF pages */ }
-
-    // Refine persona type from bio if a profile was previously stored
-    try {
-      const existingProfile = await getCreatorProfile('default');
-      if (existingProfile?.bio) {
-        seedType = inferPersonaType(existingProfile.bio, seedName);
-      }
-    } catch { /* ignore */ }
-
-    const seed: CreatorAccount = {
-      id: 'default',
-      name: seedName,
-      type: seedType,
-      createdAt: new Date().toISOString(),
-    };
-    creators = [seed];
-    await chrome.storage.sync.set({ CREATORS: creators, ACTIVE_CREATOR_ID: 'default' });
-    console.log(`[OFC] Creator auto-detected: "${seedName}" / ${seedType}`);
+    // No creators yet — nav detection in initializeChatAssistant will auto-create one.
+    cachedCreatorId = '';
+    cachedCreatorType = 'woman';
+    cachedCreatorProfile = null;
+    return;
   }
 
   const activeId = (syncData['ACTIVE_CREATOR_ID'] as string) ?? creators[0]!.id;
   const active = creators.find((c) => c.id === activeId) ?? creators[0]!;
   cachedCreatorId = active.id;
-  cachedCreatorType = active.type;
+  cachedCreatorType = active.type as CreatorType;
   cachedCreatorProfile = await getCreatorProfile(cachedCreatorId);
 }
 
@@ -302,6 +291,54 @@ function findAnchorElement(): { el: Element; pos: InsertPosition } {
   return { el: document.body, pos: 'afterend' };
 }
 
+// ─── Creator Bio Fetch ────────────────────────────────────────────────────────
+
+/**
+ * Fetch the creator's bio from their OF profile page by reading server-rendered
+ * meta tags. OF emits og:description (and meta name=description) server-side for
+ * SEO, so the text is present in the raw HTML response without needing JS execution.
+ *
+ * Runs from the content script (same-origin → session cookies are included
+ * automatically). Falls back gracefully to null on any network or parse failure.
+ */
+async function fetchCreatorBio(username: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`https://onlyfans.com/@${username}`, {
+      credentials: 'include',
+      headers: { Accept: 'text/html' },
+    });
+    if (!resp.ok) return null;
+    const html = await resp.text();
+
+    // Both attribute orderings are valid HTML; OF may use either.
+    const patterns = [
+      /<meta\s[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta\s[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i,
+      /<meta\s[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta\s[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i,
+    ];
+
+    for (const pattern of patterns) {
+      const m = html.match(pattern);
+      if (m?.[1]) {
+        // Decode HTML entities that OF encodes inside attribute values.
+        return m[1]
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"');
+      }
+    }
+
+    console.log('[OFC] Bio fetch: no meta description found in profile HTML.');
+    return null;
+  } catch (err) {
+    console.warn('[OFC] Creator bio fetch failed:', err);
+    return null;
+  }
+}
+
 // ─── Suggestion Flow ──────────────────────────────────────────────────────────
 
 async function requestSuggestions(
@@ -460,19 +497,53 @@ async function initializeChatAssistant(): Promise<void> {
       await chrome.storage.sync.set({ ACTIVE_CREATOR_ID: match.id });
       await loadCreatorState(); // refresh cachedCreatorId / type / profile for matched creator
     } else if (!match) {
-      // No stored creator matches the scraped name.
-      // Update the active account name if it's still the migration placeholder.
-      const activeCreator = allCreators.find((c) => c.id === cachedCreatorId);
-      if (activeCreator && activeCreator.name === 'Creator 1') {
-        await upsertCreatorAccount({ ...activeCreator, name: scrapedName });
-        console.log(`[OFC] Auto-named default creator: "${scrapedName}"`);
-      }
+      // First time seeing this creator — auto-create from nav identity.
+      // Type starts as 'woman' (default); the bio fetch below refines it asynchronously.
+      const newId = `c_${Date.now()}`;
+      const newCreator: CreatorAccount = {
+        id: newId,
+        name: scrapedName,
+        type: 'woman',
+        createdAt: new Date().toISOString(),
+      };
+      await upsertCreatorAccount(newCreator);
+      await chrome.storage.sync.set({ ACTIVE_CREATOR_ID: newId });
+      await loadCreatorState(); // refresh cachedCreatorId / type / profile for new creator
+      console.log(`[OFC] Auto-created creator: "${scrapedName}"`);
     }
 
     // Always sync the scraped display name to the creator profile.
     cachedCreatorProfile = await upsertCreatorProfile(cachedCreatorId, { displayName: scrapedName });
   } else if (navCreator) {
     console.warn(`[OFC] Nav selector returned chat partner's name ("${navCreator.displayName}") — skipping to avoid overwriting creator identity.`);
+  }
+
+  // If bio isn't cached yet, fetch it from the profile page to infer persona type.
+  // Fire-and-forget: doesn't block overlay creation or the first suggestion request.
+  // On completion it updates chrome.storage so the correct type is used from the
+  // next request onward; cachedCreatorType is also patched in-memory for this session.
+  const navUsername = navCreator?.username ?? null;
+  if (!w.__OFC_MOCK__ && navUsername && !cachedCreatorProfile?.bio) {
+    void (async () => {
+      const bio = await fetchCreatorBio(navUsername);
+      if (!bio) return;
+
+      cachedCreatorProfile = await upsertCreatorProfile(cachedCreatorId, { bio });
+      console.log('[OFC] Creator bio fetched from profile page.');
+
+      // Only auto-update the persona type if the chatter hasn't set it manually
+      // (i.e. it's still the default 'woman' assigned on creation).
+      const creators = await getCreators();
+      const creator = creators.find((c) => c.id === cachedCreatorId);
+      if (creator && creator.type === 'woman') {
+        const inferredType = inferPersonaType(bio, creator.name);
+        if (inferredType !== 'woman') {
+          await upsertCreatorAccount({ ...creator, type: inferredType });
+          cachedCreatorType = inferredType; // patch in-memory so current session uses it
+          console.log(`[OFC] Persona type auto-detected from bio: ${inferredType}`);
+        }
+      }
+    })();
   }
 
   overlay = new UIOverlay();
