@@ -443,8 +443,10 @@ let activeSuggestionMode: SuggestionMode = 'sell';
 // Incremented on every new suggestion request. Responses from superseded
 // requests are discarded, preventing races when fan messages arrive fast.
 let _suggestionGeneration = 0;
-// Track the current fanId for re-trigger after creator switch
-let _activeFanId: string | null = null;
+// Incremented each time initializeChatAssistant() starts. tryInject and
+// startObserver closures capture this and bail out if a newer init has
+// superseded them — prevents retry loops from running after navigation.
+let _initGeneration = 0;
 
 async function initializeChatAssistant(): Promise<void> {
   // Tear down previous instance before starting fresh.
@@ -456,11 +458,10 @@ async function initializeChatAssistant(): Promise<void> {
   _activeStopObserver = null;
   _suggestionGeneration = 0; // prevent stale gen values across re-navigations
   lastRequest = null;
+  const myGen = ++_initGeneration; // cancel stale retry loops from previous init
 
   const fanId = extractFanIdFromUrl(location.pathname);
   if (!fanId) return;
-  _activeFanId = fanId;
-
   console.log(`[OFC] Chat assistant initializing for fan: ${fanId}`);
 
   // Load creator state (multi-creator) and cached creator profile
@@ -585,6 +586,7 @@ async function initializeChatAssistant(): Promise<void> {
   // Retry injection — OF Vue app may not have rendered the anchor yet
   let attempts = 0;
   const tryInject = (): void => {
+    if (_initGeneration !== myGen) return; // superseded by newer navigation
     if (overlay!.isAttached()) return;
 
     const { el: anchor, pos } = findAnchorElement();
@@ -605,6 +607,7 @@ async function initializeChatAssistant(): Promise<void> {
   // rendered by Vue asynchronously and may not exist when the overlay first attaches.
   let observerAttempts = 0;
   const startObserver = (): void => {
+    if (_initGeneration !== myGen) return; // superseded by newer navigation
     _activeStopObserver?.();
     _activeStopObserver = null;
     if (!findChatContainer()) {
