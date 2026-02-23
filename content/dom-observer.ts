@@ -169,6 +169,23 @@ export function observeChat(
  * Mock harness: falls back to [data-from-fan] / .from-fan signals
  * on elements found via [class*="message"].
  */
+/**
+ * Detect whether the fan is currently shown as online in the chat header.
+ *
+ * Selectors are educated guesses based on OF BEM conventions (validated targets
+ * for the online status indicator — verify in DevTools if status never shows).
+ * Returns false silently when no indicator is found.
+ */
+export function detectFanOnlineStatus(): boolean {
+  const ONLINE_SELECTORS = [
+    '[class*="chat__header"] [class*="status--online"]',
+    '[class*="chat__header"] [class*="online-status"]',
+    '[class*="chat_header"] .g-avatar [class*="online"]',
+    '[class*="b-chat__header"] [class*="online"]',
+  ];
+  return ONLINE_SELECTORS.some((sel) => !!document.querySelector(sel));
+}
+
 export function scrapeConversationHistory(): ConversationMessage[] {
   const container = findChatContainer();
   if (!container) return [];
@@ -190,4 +207,70 @@ export function scrapeConversationHistory(): ConversationMessage[] {
     acc.push({ role: isFan ? 'fan' : 'creator', text });
     return acc;
   }, []);
+}
+
+// ─── PPV Purchase Scraping ────────────────────────────────────────────────────
+
+export interface ScrapedPpv {
+  price: number;
+  contentId: string; // stable key for deduplication against ppvHistory
+}
+
+/**
+ * Scan the visible chat DOM for PPV messages the fan has purchased.
+ *
+ * OF renders a price badge on locked PPV content. After purchase the message
+ * gains a "paid" / "purchased" / "unlocked" modifier class. We collect any
+ * message element matching those signals and extract the $ amount.
+ *
+ * Selectors are best-effort BEM guesses based on OF conventions — validate
+ * in DevTools if purchases are not being detected (look for the element that
+ * wraps the price after a fan unlocks content and note its class/at-attr).
+ *
+ * Returns [] silently when nothing matches (no logs — called on every message).
+ */
+export function scrapePpvPurchases(): ScrapedPpv[] {
+  const container = findChatContainer();
+  if (!container) return [];
+
+  const results: ScrapedPpv[] = [];
+  const seen = new Set<string>();
+
+  // Collect message elements that have a paid/purchased/unlocked indicator
+  const candidates = new Set<Element>();
+  const PAID_SELECTORS = [
+    '[at-attr="chat_message"] [at-attr="message_media_price"]',
+    '[at-attr="chat_message"] [class*="media--paid"]',
+    '[at-attr="chat_message"] [class*="media--purchased"]',
+    '[at-attr="chat_message"] [class*="media--unlocked"]',
+    '.b-chat__message--paid',
+    '[class*="b-chat__message--paid"]',
+  ];
+  for (const sel of PAID_SELECTORS) {
+    container.querySelectorAll(sel).forEach((el) => {
+      candidates.add(el.closest('[at-attr="chat_message"]') ?? el);
+    });
+  }
+
+  candidates.forEach((msgEl) => {
+    // Extract a $ price from any text inside the message element
+    const text = msgEl.textContent ?? '';
+    const match = text.match(/\$(\d+(?:\.\d{1,2})?)/);
+    if (!match) return;
+    const price = parseFloat(match[1]);
+    if (price <= 0 || price > 500) return; // sanity bounds — ignore noise
+
+    // Use a data attribute for the stable ID if available, otherwise derive one
+    const dataId =
+      msgEl.getAttribute('data-id') ??
+      msgEl.getAttribute('data-message-id') ??
+      msgEl.getAttribute('id');
+    const contentId = dataId ?? `ppv_p${Math.round(price * 100)}_i${results.length}`;
+
+    if (seen.has(contentId)) return;
+    seen.add(contentId);
+    results.push({ price, contentId });
+  });
+
+  return results;
 }

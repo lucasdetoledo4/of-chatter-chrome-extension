@@ -16,6 +16,7 @@ export interface FanProfile {
   tags: string[]; // e.g. ["whale", "custom-content", "ghosted"]
   notes: string; // freeform operator notes
   ppvHistory: PpvHistoryEntry[];
+  usedSuggestions?: string[]; // last 10 inserted suggestion texts
 }
 
 export type FanProfileUpdate = Partial<Omit<FanProfile, 'fanId'>>;

@@ -490,6 +490,17 @@ const STYLES = `
     color: #64748b;
   }
 
+  .ofc-ctx-online {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 100px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+  }
+
   /* ── Notes ──────────────────────────────────────────── */
   #ofc-notes {
     padding: 6px 10px 8px;
@@ -932,6 +943,21 @@ export class UIOverlay {
       notesTa.value = fan.notes ?? '';
       this.lastSavedNotes = fan.notes ?? '';
       this.resizeNotesTa();
+    }
+  }
+
+  /** Show or hide the "● online" pill in the fan context strip. */
+  setOnlineStatus(online: boolean): void {
+    const ctx = this.shadow?.querySelector<HTMLElement>('#ofc-fan-ctx');
+    if (!ctx) return;
+    const existing = ctx.querySelector('.ofc-ctx-online');
+    if (online && !existing) {
+      const pill = document.createElement('span');
+      pill.className = 'ofc-ctx-online';
+      pill.textContent = '● online';
+      ctx.appendChild(pill);
+    } else if (!online && existing) {
+      existing.remove();
     }
   }
 
