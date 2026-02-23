@@ -10,7 +10,7 @@ import type {
   CreatorType,
   SuggestionMode,
 } from '../types/index';
-import { observeChat, scrapeConversationHistory, findChatContainer, scrapeFanName } from './dom-observer';
+import { observeChat, scrapeConversationHistory, findChatContainer, scrapeFanName, detectFanOnlineStatus, scrapePpvPurchases } from './dom-observer';
 import { UIOverlay } from './ui-overlay';
 import { upsertFanProfile, getFanProfile, getCreatorProfile, upsertCreatorProfile, getCreators, upsertCreatorAccount } from '../utils/storage';
 import { CREATOR_PRESETS, pickVariationHint } from '../utils/prompt-builder';
@@ -384,8 +384,29 @@ async function handleNewMessage(
     console.log(`[OFC] Fan name scraped: "${scrapedName}"`);
   }
 
+  // Auto-track PPV purchases visible in the current conversation
+  const scrapedPpvs = scrapePpvPurchases();
+  if (scrapedPpvs.length > 0) {
+    const existingIds = new Set(fanProfile.ppvHistory.map((p) => p.contentId));
+    const newPpvs = scrapedPpvs.filter((p) => !existingIds.has(p.contentId));
+    if (newPpvs.length > 0) {
+      const addedValue = newPpvs.reduce((sum, p) => sum + p.price, 0);
+      fanProfile = await upsertFanProfile(fanId, {
+        ppvHistory: [
+          ...fanProfile.ppvHistory,
+          ...newPpvs.map((p) => ({ contentId: p.contentId, price: p.price, date: new Date().toISOString() })),
+        ],
+        lifetimeValue: fanProfile.lifetimeValue + addedValue,
+      });
+      console.log(`[OFC] PPV tracked: ${newPpvs.length} purchase(s), +$${addedValue.toFixed(2)}`);
+    }
+  }
+
   // Show fan context strip immediately — persists through loading/suggestions/error
   overlay.showFanContext(fanProfile);
+
+  // Surface online status if detectable in the chat header DOM
+  overlay.setOnlineStatus(detectFanOnlineStatus());
 
   // Build conversation context (scraped history + new message appended)
   const history = scrapeConversationHistory();
@@ -439,6 +460,9 @@ async function fireSuggestionsRequest(
 // Without these, navigating away and back creates duplicate panels and stale observers.
 let _activeHostGuard: MutationObserver | null = null;
 let _activeStopObserver: (() => void) | null = null;
+let _onlineCheckInterval: ReturnType<typeof setInterval> | null = null;
+let _messageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingMessage: ConversationMessage | null = null;
 let activeSuggestionMode: SuggestionMode = 'sell';
 // Incremented on every new suggestion request. Responses from superseded
 // requests are discarded, preventing races when fan messages arrive fast.
@@ -456,6 +480,9 @@ async function initializeChatAssistant(): Promise<void> {
   _activeHostGuard = null;
   _activeStopObserver?.();
   _activeStopObserver = null;
+  if (_onlineCheckInterval) { clearInterval(_onlineCheckInterval); _onlineCheckInterval = null; }
+  if (_messageDebounceTimer) { clearTimeout(_messageDebounceTimer); _messageDebounceTimer = null; }
+  _pendingMessage = null;
   _suggestionGeneration = 0; // prevent stale gen values across re-navigations
   lastRequest = null;
   const myGen = ++_initGeneration; // cancel stale retry loops from previous init
@@ -549,7 +576,14 @@ async function initializeChatAssistant(): Promise<void> {
 
   overlay = new UIOverlay();
   overlay.setMode(activeSuggestionMode); // apply persisted mode before first inject
-  overlay.setInsertHandler(insertIntoChat);
+  overlay.setInsertHandler((text) => {
+    insertIntoChat(text);
+    void (async () => {
+      const p = await getFanProfile(fanId);
+      const recent = (p?.usedSuggestions ?? []).slice(-9);
+      await upsertFanProfile(fanId, { usedSuggestions: [...recent, text] });
+    })();
+  });
   overlay.setNotesSaveHandler((notes) => { void upsertFanProfile(fanId, { notes }); });
 
   overlay.setRegenerateHandler(() => {
@@ -582,6 +616,11 @@ async function initializeChatAssistant(): Promise<void> {
   // Pass initial creator list to the overlay
   const creators = await getCreators();
   overlay.setCreators(creators, cachedCreatorId);
+
+  // Poll for fan online status every 30s (initial check happens in handleNewMessage)
+  _onlineCheckInterval = setInterval(() => {
+    overlay?.setOnlineStatus(detectFanOnlineStatus());
+  }, 30_000);
 
   // Retry injection — OF Vue app may not have rendered the anchor yet
   let attempts = 0;
@@ -621,7 +660,16 @@ async function initializeChatAssistant(): Promise<void> {
     }
     observerAttempts = 0;
     _activeStopObserver = observeChat((msg) => {
-      void handleNewMessage(msg, fanId, overlay!, (req) => { lastRequest = req; });
+      // Debounce: if the fan sends several messages in quick succession, wait for
+      // the burst to settle before firing an API call. Use the last message seen.
+      _pendingMessage = msg;
+      if (_messageDebounceTimer) clearTimeout(_messageDebounceTimer);
+      _messageDebounceTimer = setTimeout(() => {
+        _messageDebounceTimer = null;
+        const pending = _pendingMessage;
+        _pendingMessage = null;
+        if (pending) void handleNewMessage(pending, fanId, overlay!, (req) => { lastRequest = req; });
+      }, 400);
     });
   };
 

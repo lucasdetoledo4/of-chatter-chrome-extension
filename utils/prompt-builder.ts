@@ -198,9 +198,27 @@ Fan: "do you do customs as a couple?"
 function buildFanContext(fan: FanProfile): string {
   const parts: string[] = [];
 
-  if (fan.lifetimeValue >= 200) parts.push('high-value spender (treat as VIP)');
-  else if (fan.lifetimeValue >= 50) parts.push('regular spender');
-  else if (fan.lifetimeValue === 0) parts.push('has not spent yet (conversion opportunity)');
+  // Spend tier with PPV price guidance so the model knows what to pitch
+  if (fan.lifetimeValue >= 200) {
+    parts.push('high-value spender (treat as VIP) — premium PPV $25–50+, exclusive/luxury framing');
+  } else if (fan.lifetimeValue >= 50) {
+    parts.push('regular spender — PPV price range $10–25, mid-tier framing');
+  } else if (fan.lifetimeValue > 0) {
+    parts.push('low spender — introduce PPV gently, start at $5–10 to lower the barrier');
+  } else {
+    // $0 spent — flag time-waster risk if message count is high
+    if (fan.messageCount >= 15) {
+      parts.push('has not spent yet — high message count with no purchase suggests time-waster; keep upsells brief and direct');
+    } else {
+      parts.push('has not spent yet — conversion opportunity; start PPV at $5–10 to lower the barrier');
+    }
+  }
+
+  // Recency signal — if the fan has been quiet, re-engagement tone first
+  const daysSinceLastSeen = Math.floor((Date.now() - new Date(fan.lastSeen).getTime()) / 86400000);
+  if (daysSinceLastSeen >= 7) {
+    parts.push(`been quiet for ${daysSinceLastSeen} day${daysSinceLastSeen === 1 ? '' : 's'} — re-engagement tone first, no hard sell`);
+  }
 
   if (fan.tags.includes('whale')) parts.push('whale — responds well to exclusive/premium framing');
   if (fan.tags.includes('ghosted')) parts.push('has gone quiet before — re-engagement is the priority');
@@ -327,6 +345,9 @@ export function buildSuggestionPrompt(input: PromptInput): BuiltPrompt {
 
   const personaSection = buildPersonaSection(creatorPersona, creatorProfile, creatorRealMessages);
   const fanContext = buildFanContext(fanProfile);
+  const usedBlock = fanProfile.usedSuggestions?.length
+    ? `\n\n## Do not repeat\nThese replies were already sent to this fan — avoid anything similar:\n${fanProfile.usedSuggestions.slice(-5).map((t) => `- "${t.slice(0, 80)}"`).join('\n')}`
+    : '';
   const subDuration = calculateSubDuration(fanProfile.firstSeen);
   const displayName = creatorProfile?.displayName || creatorPersona.name;
 
@@ -346,7 +367,7 @@ ${personaSection}
 
 ## Fan profile
 Name: ${fanProfile.displayName} | Subscribed: ${subDuration} | Total spent: $${fanProfile.lifetimeValue.toFixed(2)} | Last seen: ${formatLastSeen(fanProfile.lastSeen)}
-${fanContext}
+${fanContext}${usedBlock}
 
 ## Suggestion tiers
 ${buildModeTierInstructions(mode)}

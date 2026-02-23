@@ -145,16 +145,25 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
 
   let response = await fetchOnce();
 
-  // Retry once on transient server errors (5xx) or rate-limit overload (529).
+  // Retry with exponential backoff on 529 (overloaded) and 5xx transient errors.
   // 4xx errors (bad key, invalid request) are not retried — they won't recover.
-  if (response.status >= 500 || response.status === 529) {
-    await new Promise((r) => setTimeout(r, 1000));
+  const RETRY_DELAYS = [1000, 2000, 4000];
+  for (const delay of RETRY_DELAYS) {
+    if (response.ok) break;
+    if (response.status !== 529 && response.status < 500) break;
+    await new Promise((r) => setTimeout(r, delay));
     response = await fetchOnce();
   }
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+    let message = `API error ${response.status}`;
+    try {
+      const body = JSON.parse(errorText) as { error?: { message?: string } };
+      if (body.error?.message) message = body.error.message;
+    } catch { /* leave generic message */ }
+    if (response.status === 529) message = 'API overloaded — please try again in a moment';
+    throw new Error(message);
   }
 
   const data = (await response.json()) as AnthropicApiResponse;
