@@ -53,6 +53,19 @@ function getActivePersona(): CreatorPersona {
 }
 
 /**
+ * Normalise a creator display name for fuzzy matching.
+ * Strips emojis / special punctuation, lowercases, collapses whitespace.
+ * "Sofia 💕" and "sofia" both normalise to "sofia".
+ */
+function normalizeCreatorName(name: string): string {
+  return name
+    .replace(/[^\w\s&\u0080-\uFFFF]/g, '') // keep letters (incl. accented), digits, spaces, &
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
  * Infer a creator persona type from their bio + display name using keyword heuristics.
  * This is a best-effort starting point — chatters always override in the popup.
  */
@@ -429,16 +442,35 @@ async function initializeChatAssistant(): Promise<void> {
   const chatPartnerName = scrapeFanName();
   const navCreator = scrapeCreatorFromNav();
   if (navCreator && navCreator.displayName !== chatPartnerName) {
-    cachedCreatorProfile = await upsertCreatorProfile(cachedCreatorId, { displayName: navCreator.displayName });
-    console.log(`[OFC] Creator name from nav: "${navCreator.displayName}"`);
+    const scrapedName = navCreator.displayName;
+    console.log(`[OFC] Creator name from nav: "${scrapedName}"`);
 
-    // Sync the scraped name into the creator account so the panel header reflects it.
-    // Only update when the account name is still the migration default ("Creator 1").
-    const creators = await getCreators();
-    const creator = creators.find((c) => c.id === cachedCreatorId);
-    if (creator && creator.name === 'Creator 1') {
-      await upsertCreatorAccount({ ...creator, name: navCreator.displayName });
+    const allCreators = await getCreators();
+    const normalizedScraped = normalizeCreatorName(scrapedName);
+
+    // Find a stored creator whose name fuzzy-matches the scraped nav identity.
+    // This lets the extension auto-switch when the chatter toggles between OF accounts.
+    const match = allCreators.find(
+      (c) => normalizeCreatorName(c.name) === normalizedScraped
+    );
+
+    if (match && match.id !== cachedCreatorId) {
+      // Nav identifies a different stored creator — auto-switch to it.
+      console.log(`[OFC] Auto-switching to creator "${match.name}" (${match.id}) from nav.`);
+      await chrome.storage.sync.set({ ACTIVE_CREATOR_ID: match.id });
+      await loadCreatorState(); // refresh cachedCreatorId / type / profile for matched creator
+    } else if (!match) {
+      // No stored creator matches the scraped name.
+      // Update the active account name if it's still the migration placeholder.
+      const activeCreator = allCreators.find((c) => c.id === cachedCreatorId);
+      if (activeCreator && activeCreator.name === 'Creator 1') {
+        await upsertCreatorAccount({ ...activeCreator, name: scrapedName });
+        console.log(`[OFC] Auto-named default creator: "${scrapedName}"`);
+      }
     }
+
+    // Always sync the scraped display name to the creator profile.
+    cachedCreatorProfile = await upsertCreatorProfile(cachedCreatorId, { displayName: scrapedName });
   } else if (navCreator) {
     console.warn(`[OFC] Nav selector returned chat partner's name ("${navCreator.displayName}") — skipping to avoid overwriting creator identity.`);
   }
