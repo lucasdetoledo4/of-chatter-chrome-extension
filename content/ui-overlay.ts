@@ -962,10 +962,13 @@ export class UIOverlay {
     const drop = this.shadow?.querySelector<HTMLElement>('#ofc-creator-drop');
     if (!drop) return;
 
-    // Only show the switcher button if there are multiple creators
+    // Always show the creator name; hide the chevron when there's only one creator
     const creatorBtn = this.shadow?.querySelector<HTMLElement>('#ofc-creator-btn');
     if (creatorBtn) {
-      creatorBtn.style.display = this._creators.length > 1 ? '' : 'none';
+      creatorBtn.style.display = '';
+      creatorBtn.style.cursor = this._creators.length > 1 ? 'pointer' : 'default';
+      const chevron = creatorBtn.querySelector<HTMLElement>('.ofc-creator-chevron');
+      if (chevron) chevron.style.display = this._creators.length > 1 ? '' : 'none';
     }
 
     drop.innerHTML = this._creators.map((c) => `
