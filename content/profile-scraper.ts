@@ -86,7 +86,6 @@ export function scrapeCreatorProfile(): ScrapedProfile | null {
     .slice(0, 5);
 
   const result: ScrapedProfile = { displayName, bio, profilePhotoUrl, recentCaptions };
-  console.log('[OFC] Profile scraped:', result);
   return result;
 }
 

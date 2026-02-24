@@ -47,8 +47,6 @@ async function tagLink(link: HTMLAnchorElement): Promise<void> {
   const tags = computeAutoTags(profile);
   if (tags.length === 0) return;
 
-  console.log(`[OFC Inbox] tagging fan ${fanId}:`, tags);
-
   // Remove stale container if it exists (re-tag after profile change)
   link.querySelector('.ofc-inbox-tags')?.remove();
 
@@ -73,9 +71,6 @@ function scanAndTag(): void {
   const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="/my/chats/chat/"], a[href*="/messages/"]'
   ));
-  if (links.length > 0) {
-    console.log(`[OFC Inbox] found ${links.length} conversation link(s)`);
-  }
   for (const link of links) {
     if (!link.dataset.ofcTagged) void tagLink(link);
   }

@@ -50,7 +50,6 @@ import {
   StorageKey,
 } from '../utils/constants';
 
-console.log('[OFC] Content script loaded.');
 
 // ─── Mock window ──────────────────────────────────────────────────────────────
 
@@ -161,7 +160,7 @@ async function handleNewMessage(
   const scrapedName = scrapeFanName();
   if (scrapedName && fanProfile.displayName === fanId) {
     fanProfile = await upsertFanProfile(fanId, { displayName: scrapedName });
-    console.log(`[OFC] Fan name scraped: "${scrapedName}"`);
+
   }
 
   // Auto-track PPV purchases visible in the current conversation
@@ -178,7 +177,7 @@ async function handleNewMessage(
         ],
         lifetimeValue: fanProfile.lifetimeValue + addedValue,
       });
-      console.log(`[OFC] PPV tracked: ${newPpvs.length} purchase(s), +$${addedValue.toFixed(2)}`);
+
     }
   }
 
@@ -217,7 +216,7 @@ async function handleNewMessage(
         [StorageKey.SuggestionMode]: 'sell',
         [StorageKey.FanModePrefix + fanId]: 'sell',
       });
-      console.log(`[OFC] Auto-switched to Sell mode — trigger word: "${keyword}"`);
+
     }
   }
 
@@ -286,7 +285,6 @@ async function initializeChatAssistant(): Promise<void> {
 
   const fanId = extractFanIdFromUrl(location.pathname);
   if (!fanId) return;
-  console.log(`[OFC] Chat assistant initializing for fan: ${fanId}`);
 
   // Load creator state (multi-creator) and cached creator profile
   await loadCreatorState();
@@ -308,7 +306,7 @@ async function initializeChatAssistant(): Promise<void> {
   const navCreator = scrapeCreatorFromNav();
   if (navCreator && navCreator.displayName !== chatPartnerName) {
     const scrapedName = navCreator.displayName;
-    console.log(`[OFC] Creator name from nav: "${scrapedName}"`);
+
 
     const allCreators = await getCreators();
     const normalizedScraped = normalizeCreatorName(scrapedName);
@@ -321,7 +319,7 @@ async function initializeChatAssistant(): Promise<void> {
 
     if (match && match.id !== getCreatorId()) {
       // Nav identifies a different stored creator — auto-switch to it.
-      console.log(`[OFC] Auto-switching to creator "${match.name}" (${match.id}) from nav.`);
+
       await chrome.storage.sync.set({ [StorageKey.ActiveCreatorId]: match.id });
       await loadCreatorState(); // refresh state for matched creator
     } else if (!match) {
@@ -337,7 +335,7 @@ async function initializeChatAssistant(): Promise<void> {
       await upsertCreatorAccount(newCreator);
       await chrome.storage.sync.set({ [StorageKey.ActiveCreatorId]: newId });
       await loadCreatorState(); // refresh state for new creator
-      console.log(`[OFC] Auto-created creator: "${scrapedName}"`);
+
     }
 
     // Always sync the scraped display name to the creator profile.
@@ -357,7 +355,7 @@ async function initializeChatAssistant(): Promise<void> {
       if (!bio) return;
 
       setCreatorProfile(await upsertCreatorProfile(getCreatorId(), { bio }));
-      console.log('[OFC] Creator bio fetched from profile page.');
+
 
       // Only auto-update the persona type if the chatter hasn't set it manually
       // (i.e. it's still the default 'woman' assigned on creation).
@@ -368,7 +366,7 @@ async function initializeChatAssistant(): Promise<void> {
         if (inferredType !== 'woman') {
           await upsertCreatorAccount({ ...creator, type: inferredType });
           setCreatorType(inferredType); // patch in-memory so current session uses it
-          console.log(`[OFC] Persona type auto-detected from bio: ${inferredType}`);
+
         }
       }
     })();
@@ -438,7 +436,7 @@ async function initializeChatAssistant(): Promise<void> {
     overlay!.inject(anchor, pos);
 
     if (overlay!.isAttached()) {
-      console.log('[OFC] Chat assistant initialized.');
+
       startObserver();
     } else if (attempts < INJECT_RETRY_LIMIT) {
       attempts++;
@@ -485,7 +483,7 @@ async function initializeChatAssistant(): Promise<void> {
   // Re-inject whenever the panel disappears from the document.
   const hostGuard = new MutationObserver(() => {
     if (!overlay?.isAttached()) {
-      console.log('[OFC] Panel removed by React — re-injecting.');
+
       attempts = 0;
       tryInject();
     }
@@ -511,14 +509,14 @@ const navObserver = new MutationObserver(() => {
       // Always keep inbox tagger running — left panel list stays visible in split view
       startInboxTagger();
       if (fanId) {
-        console.log('[OFC] SPA navigation to chat page — re-initializing.');
+
         void initializeChatAssistant();
       } else {
         // Inbox only — tear down any open chat panel
         overlay?.remove();
         overlay = null;
         lastRequest = null;
-        console.log('[OFC] SPA navigation to inbox.');
+
       }
     } else {
       // Navigated away from chats entirely — stop everything
@@ -554,7 +552,7 @@ const navObserver = new MutationObserver(() => {
                   type: typeChanged ? inferredType : creator.type,
                 };
                 await upsertCreatorAccount(updated);
-                console.log(`[OFC] Creator account updated from profile: name="${updated.name}" type="${updated.type}"`);
+
                 // onChanged fires → overlay creator name + panel update
               }
             }

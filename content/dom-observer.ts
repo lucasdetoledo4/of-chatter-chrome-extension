@@ -154,7 +154,7 @@ export function observeChat(
   });
 
   observer.observe(container, { childList: true, subtree: true });
-  console.log('[OFC] Chat observer started.');
+
 
   return () => observer.disconnect();
 }
