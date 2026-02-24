@@ -103,7 +103,7 @@ export async function loadCreatorState(): Promise<void> {
   if (cleaned.length !== creators.length) {
     creators = cleaned;
     await chrome.storage.sync.set({ [StorageKey.Creators]: creators });
-    console.log('[OFC] Removed legacy placeholder creators.');
+
   }
 
   if (creators.length === 0) {
@@ -141,7 +141,7 @@ export function triggerStyleAnalysisIfNeeded(creatorRealMessages: string[]): voi
   const reason = cachedCreatorProfile?.writingStyle
     ? 'refreshing stale style'
     : 'analysing creator voice';
-  console.log(`[OFC] Style analysis triggered — ${reason}…`);
+
 
   chrome.runtime
     .sendMessage<AnalyzeCreatorStyleRequest, BackgroundResponse>(req)
@@ -151,7 +151,7 @@ export function triggerStyleAnalysisIfNeeded(creatorRealMessages: string[]): voi
           writingStyle: resp.writingStyle.slice(0, CREATOR_STYLE_MAX_CHARS),
           styleAnalyzedAt: new Date().toISOString(),
         });
-        console.log('[OFC] Style analysis complete — creator voice cached');
+
       }
     })
     .catch((err: unknown) => {
@@ -198,7 +198,7 @@ export async function fetchCreatorBio(username: string): Promise<string | null> 
       }
     }
 
-    console.log('[OFC] Bio fetch: no meta description found in profile HTML.');
+
     return null;
   } catch (err) {
     console.warn('[OFC] Creator bio fetch failed:', err);

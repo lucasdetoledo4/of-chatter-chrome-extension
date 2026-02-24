@@ -23,20 +23,8 @@ import {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-chrome.runtime.onInstalled.addListener(async () => {
-  const pruned = await pruneOldProfiles();
-  if (pruned > 0) {
-    console.log(`[OFC SW] Pruned ${pruned} stale fan profiles.`);
-  }
-});
-
-// Also prune on every browser startup — onInstalled only fires on extension install/update.
-chrome.runtime.onStartup.addListener(async () => {
-  const pruned = await pruneOldProfiles();
-  if (pruned > 0) {
-    console.log(`[OFC SW] Pruned ${pruned} stale fan profiles on startup.`);
-  }
-});
+chrome.runtime.onInstalled.addListener(() => { void pruneOldProfiles(); });
+chrome.runtime.onStartup.addListener(() => { void pruneOldProfiles(); });
 
 // ─── Message Handler ──────────────────────────────────────────────────────────
 
@@ -187,16 +175,6 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
   }
 
   const data = (await response.json()) as AnthropicApiResponse;
-
-  // Log cache stats so you can verify caching is working in the SW console.
-  // First request: cache_creation_input_tokens > 0, cache_read = 0.
-  // Subsequent requests within 5min: cache_read_input_tokens > 0.
-  const { input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens } = data.usage;
-  console.log(
-    `[OFC SW] tokens — in: ${input_tokens}, out: ${output_tokens}` +
-    (cache_creation_input_tokens ? `, cache_write: ${cache_creation_input_tokens}` : '') +
-    (cache_read_input_tokens     ? `, cache_read: ${cache_read_input_tokens}`      : '')
-  );
 
   const textBlock = data.content.find((b) => b.type === 'text');
   if (!textBlock) {
