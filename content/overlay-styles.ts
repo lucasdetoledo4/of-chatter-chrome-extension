@@ -4,6 +4,11 @@
 export const STYLES = `
   :host {
     display: block;
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 460px;
+    z-index: 2147483647;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -14,11 +19,10 @@ export const STYLES = `
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     overflow: hidden;
-    margin: 8px 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
     width: 100%;
-    min-width: 320px;
-    max-width: 560px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
   }
 
   .ofc-hidden { display: none !important; }
@@ -36,7 +40,9 @@ export const STYLES = `
     justify-content: space-between;
     padding: 8px 8px 8px 12px;
     gap: 8px;
+    cursor: grab;
   }
+  #ofc-header-row button { cursor: pointer; }
 
   #ofc-title {
     display: flex;
@@ -171,7 +177,7 @@ export const STYLES = `
     border-left: 3px solid #f59e0b;
     padding: 4px 10px;
   }
-  #ofc-trigger-notice.visible { display: block; }
+  #ofc-trigger-notice.visible { display: block; position: relative; z-index: 10; }
 
   /* ── Mode toggle ─────────────────────────────────────────── */
   #ofc-modes {
@@ -220,6 +226,7 @@ export const STYLES = `
   /* ── Body ───────────────────────────────────────────────── */
   #ofc-body {
     overflow: hidden;
+    isolation: isolate;
   }
 
   #ofc-panel.collapsed #ofc-body {
