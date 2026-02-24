@@ -8,6 +8,7 @@ export enum StorageKey {
   ActiveCreatorId = 'ACTIVE_CREATOR_ID',
   Creators        = 'CREATORS',
   SuggestionMode  = 'OFC_SUGGESTION_MODE',
+  FanModePrefix   = 'ofc_mode:',
   FanPrefix       = 'fan:',
   CreatorPrefix   = 'creator:',
 }
@@ -36,9 +37,11 @@ export const STYLE_REFRESH_MS      = 7 * 24 * 60 * 60 * 1000;
 
 // ─── UI feedback timings (ms) ─────────────────────────────────────────────────
 
-export const REGEN_FEEDBACK_MS = 2000;
-export const NOTES_SAVED_MS    = 1500;
-export const DROP_GUARD_MS     = 10;
+export const REGEN_FEEDBACK_MS  = 2000;
+export const REGEN_COOLDOWN_MS  = 1000;
+export const NOTES_SAVED_MS     = 1500;
+export const DROP_GUARD_MS      = 10;
+export const HISTORY_MAX_SETS   = 3;
 
 // ─── Prompt / conversation limits ─────────────────────────────────────────────
 

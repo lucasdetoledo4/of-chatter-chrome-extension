@@ -272,10 +272,13 @@ async function initializeChatAssistant(): Promise<void> {
   // Load creator state (multi-creator) and cached creator profile
   await loadCreatorState();
 
-  // Restore persisted suggestion mode (survives page reloads and extension updates)
-  const modeResult = await chrome.storage.local.get(StorageKey.SuggestionMode);
-  const persistedMode = modeResult[StorageKey.SuggestionMode] as SuggestionMode | undefined;
-  if (persistedMode) activeSuggestionMode = persistedMode;
+  // Restore suggestion mode: fan-specific key takes precedence over global fallback.
+  // This lets chatters use different modes per fan without affecting other conversations.
+  const fanModeKey = StorageKey.FanModePrefix + fanId;
+  const modeResult = await chrome.storage.local.get([StorageKey.SuggestionMode, fanModeKey]);
+  const fanSpecificMode = modeResult[fanModeKey] as SuggestionMode | undefined;
+  const globalMode = modeResult[StorageKey.SuggestionMode] as SuggestionMode | undefined;
+  activeSuggestionMode = fanSpecificMode ?? globalMode ?? 'sell';
 
   // Scrape creator identity from the sidebar nav — available on every page,
   // so we get the real name without requiring a profile page visit.
@@ -376,7 +379,13 @@ async function initializeChatAssistant(): Promise<void> {
 
   overlay.setModeChangeHandler((mode) => {
     activeSuggestionMode = mode;
-    void chrome.storage.local.set({ [StorageKey.SuggestionMode]: mode });
+    // Write both global default and fan-specific key so:
+    // - other fans see this as the new global default
+    // - this fan always resumes with the mode set for them
+    void chrome.storage.local.set({
+      [StorageKey.SuggestionMode]: mode,
+      [StorageKey.FanModePrefix + fanId]: mode,
+    });
     if (lastRequest) {
       const req = { ...lastRequest, mode };
       lastRequest = req; // keep regen in sync with current mode

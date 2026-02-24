@@ -11,8 +11,10 @@ import { STYLES } from './overlay-styles';
 import {
   PANEL_HOST_ID,
   REGEN_FEEDBACK_MS,
+  REGEN_COOLDOWN_MS,
   NOTES_SAVED_MS,
   DROP_GUARD_MS,
+  HISTORY_MAX_SETS,
 } from '../utils/constants';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -70,6 +72,9 @@ export class UIOverlay {
   private _activeCreatorId: string = '';
   private _dropOpen = false;
   private _justToggledDrop = false;
+  private _regenStartedAt = 0;
+  private _history: Suggestion[][] = [];
+  private _historyIdx = -1;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
@@ -149,6 +154,8 @@ export class UIOverlay {
           <button class="ofc-mode-btn${this.activeMode === 're_engage' ? ' active' : ''}" data-mode="re_engage">Re-engage</button>
         </div>
         <div id="ofc-actions">
+          <button id="ofc-prev" class="ofc-hbtn" title="Previous suggestions" style="display:none">←</button>
+          <button id="ofc-next" class="ofc-hbtn" title="Next suggestions" style="display:none">→</button>
           <button id="ofc-regen" class="ofc-hbtn" title="Regenerate (Alt+R)" style="display:none">
             ${ICON_REGEN}
           </button>
@@ -203,6 +210,16 @@ export class UIOverlay {
     // Wire header buttons
     const regenBtn = header.querySelector<HTMLButtonElement>('#ofc-regen')!;
     regenBtn.addEventListener('click', () => this.regenerateHandler?.());
+
+    const prevBtn = header.querySelector<HTMLButtonElement>('#ofc-prev')!;
+    prevBtn.addEventListener('click', () => {
+      if (this._historyIdx > 0) { this._historyIdx--; this._renderCurrentHistory(); }
+    });
+
+    const nextBtn = header.querySelector<HTMLButtonElement>('#ofc-next')!;
+    nextBtn.addEventListener('click', () => {
+      if (this._historyIdx < this._history.length - 1) { this._historyIdx++; this._renderCurrentHistory(); }
+    });
 
     const collapseBtn = header.querySelector<HTMLButtonElement>('#ofc-collapse')!;
     collapseBtn.addEventListener('click', () => this.toggleCollapse());
@@ -283,6 +300,7 @@ export class UIOverlay {
 
   /** Regen-specific loading: keep current suggestions visible but dimmed, spin the icon. */
   showRegenLoading(): void {
+    this._regenStartedAt = Date.now();
     const regenBtn = this.shadow?.querySelector<HTMLButtonElement>('#ofc-regen');
     if (regenBtn) {
       regenBtn.classList.add('spinning');
@@ -295,40 +313,10 @@ export class UIOverlay {
   showSuggestions(suggestions: Suggestion[]): void {
     if (!this.panel) return;
     this.clearRegenLoading();
-
-    const count = suggestions.length;
-    this.setCount(count > 0 ? `${count} suggestion${count === 1 ? '' : 's'}` : '');
-
-    const modeTiers = MODE_TIER_CONFIG[this.activeMode];
-    const cardsHtml = suggestions
-      .map((s, i) => {
-        const cfg = modeTiers?.[i] ?? TYPE_CONFIG[s.type] ?? TYPE_CONFIG.engage;
-        return `
-          <div class="ofc-card" data-text="${escapeHtml(s.text)}">
-            <div class="ofc-accent-bar" style="background:${cfg.accent};"></div>
-            <div class="ofc-card-body">
-              <div class="ofc-card-top">
-                <span class="ofc-badge" style="background:${cfg.labelBg};color:${cfg.labelColor};">
-                  ${escapeHtml(cfg.label)}
-                </span>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <span class="ofc-kbd" title="Alt+${i + 1}">alt ${i + 1}</span>
-                  <button class="ofc-use-btn">Use →</button>
-                </div>
-              </div>
-              <div class="ofc-text">${escapeHtml(s.text)}</div>
-            </div>
-          </div>
-        `;
-      })
-      .join('');
-
-    this.setBodyContent(`<div class="ofc-suggestions">${cardsHtml}</div>`);
-    this.setRegenVisible(true);
-
-    // Single delegated listener on the container — O(1) instead of O(n) per-card
-    const container = this.shadow?.querySelector<HTMLElement>('.ofc-suggestions');
-    if (container) this.wireCardClicks(container);
+    this._history.push(suggestions);
+    if (this._history.length > HISTORY_MAX_SETS) this._history.shift();
+    this._historyIdx = this._history.length - 1;
+    this._renderCurrentHistory();
   }
 
   showError(msg: string): void {
@@ -429,6 +417,59 @@ export class UIOverlay {
     }
   }
 
+  private _renderCurrentHistory(): void {
+    const suggestions = this._history[this._historyIdx];
+    if (!suggestions) return;
+
+    const histTotal = this._history.length;
+    const histPos = this._historyIdx + 1;
+    const count = suggestions.length;
+    this.setCount(
+      histTotal > 1
+        ? `${histPos}/${histTotal}`
+        : count > 0 ? `${count} suggestion${count === 1 ? '' : 's'}` : ''
+    );
+
+    const modeTiers = MODE_TIER_CONFIG[this.activeMode];
+    const cardsHtml = suggestions
+      .map((s, i) => {
+        const cfg = modeTiers?.[i] ?? TYPE_CONFIG[s.type] ?? TYPE_CONFIG.engage;
+        return `
+          <div class="ofc-card" data-text="${escapeHtml(s.text)}">
+            <div class="ofc-accent-bar" style="background:${cfg.accent};"></div>
+            <div class="ofc-card-body">
+              <div class="ofc-card-top">
+                <span class="ofc-badge" style="background:${cfg.labelBg};color:${cfg.labelColor};">
+                  ${escapeHtml(cfg.label)}
+                </span>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <span class="ofc-kbd" title="Alt+${i + 1}">alt ${i + 1}</span>
+                  <button class="ofc-use-btn">Use →</button>
+                </div>
+              </div>
+              <div class="ofc-text">${escapeHtml(s.text)}</div>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+    this.setBodyContent(`<div class="ofc-suggestions">${cardsHtml}</div>`);
+    this.setRegenVisible(true);
+    this._syncHistoryBtns();
+
+    // Single delegated listener on the container — O(1) instead of O(n) per-card
+    const container = this.shadow?.querySelector<HTMLElement>('.ofc-suggestions');
+    if (container) this.wireCardClicks(container);
+  }
+
+  private _syncHistoryBtns(): void {
+    const prevBtn = this.shadow?.querySelector<HTMLButtonElement>('#ofc-prev');
+    const nextBtn = this.shadow?.querySelector<HTMLButtonElement>('#ofc-next');
+    if (prevBtn) prevBtn.style.display = this._historyIdx > 0 ? '' : 'none';
+    if (nextBtn) nextBtn.style.display = this._historyIdx < this._history.length - 1 ? '' : 'none';
+  }
+
   private _syncCreatorBtn(): void {
     const nameEl = this.shadow?.querySelector<HTMLElement>('#ofc-creator-name');
     const active = this._creators.find((c) => c.id === this._activeCreatorId) ?? this._creators[0];
@@ -492,7 +533,13 @@ export class UIOverlay {
     const regenBtn = this.shadow?.querySelector<HTMLButtonElement>('#ofc-regen');
     if (regenBtn) {
       regenBtn.classList.remove('spinning');
-      regenBtn.disabled = false;
+      const elapsed = Date.now() - this._regenStartedAt;
+      const remaining = Math.max(0, REGEN_COOLDOWN_MS - elapsed);
+      if (remaining > 0) {
+        setTimeout(() => { regenBtn.disabled = false; }, remaining);
+      } else {
+        regenBtn.disabled = false;
+      }
     }
     const body = this.panel?.querySelector<HTMLElement>('#ofc-body');
     body?.classList.remove('regen-loading');
