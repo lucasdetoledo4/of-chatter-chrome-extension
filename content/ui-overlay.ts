@@ -16,6 +16,8 @@ import {
   DROP_GUARD_MS,
   HISTORY_MAX_SETS,
   TRIGGER_NOTICE_MS,
+  PPV_TIER_LOW_MAX,
+  PPV_TIER_MID_MAX,
 } from '../utils/constants';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -51,6 +53,23 @@ function formatSubDuration(firstSeen: string): string {
   if (days < 30) return `${Math.floor(days / 7)}wk`;
   if (days < 365) return `${Math.floor(days / 30)}mo`;
   return `${Math.floor(days / 365)}yr`;
+}
+
+/**
+ * 0–5 purchase-intent score derived from existing fan profile data.
+ * Mirrors OnlyMonster's "Buying Power" signal.
+ *   +2  any spend at all
+ *   +1  spent ≥ $50
+ *   +1  spent ≥ $200
+ *   +1  3+ PPV purchases (repeat buyer)
+ */
+function buyingPowerScore(fan: FanProfile): number {
+  let score = 0;
+  if (fan.lifetimeValue > 0) score += 2;
+  if (fan.lifetimeValue >= PPV_TIER_LOW_MAX) score += 1;
+  if (fan.lifetimeValue >= PPV_TIER_MID_MAX) score += 1;
+  if (fan.ppvHistory.length >= 3) score += 1;
+  return Math.min(score, 5);
 }
 
 // ─── UIOverlay class ──────────────────────────────────────────────────────────
@@ -341,16 +360,41 @@ export class UIOverlay {
     const ctx = this.shadow?.querySelector<HTMLElement>('#ofc-fan-ctx');
     if (!ctx) return;
 
+    const score = buyingPowerScore(fan);
+    const bpColor = score <= 1 ? '#94a3b8' : score <= 3 ? '#d97706' : '#10b981';
+    const bpTip = `${score}/5 · ${fan.ppvHistory.length} PPV purchase${fan.ppvHistory.length === 1 ? '' : 's'}`;
+    const dots = '●'.repeat(score) + '○'.repeat(5 - score);
+
     const tagPills = fan.tags
       .slice(0, 3)
       .map((t) => `<span class="ofc-ctx-tag">${escapeHtml(t)}</span>`)
       .join('');
 
+    const metaRow = fan.tags.length > 0
+      ? `<div class="ofc-fan-meta">${tagPills}</div>`
+      : '';
+
     ctx.innerHTML = `
-      <span class="ofc-ctx-spend" style="color:${spendColor(fan.lifetimeValue)}">${formatSpend(fan.lifetimeValue)}</span>
-      <span class="ofc-ctx-sep">·</span>
-      <span class="ofc-ctx-dur">${formatSubDuration(fan.firstSeen)}</span>
-      ${fan.tags.length > 0 ? `<span class="ofc-ctx-sep">·</span>${tagPills}` : ''}
+      <div class="ofc-fan-stats">
+        <div class="ofc-stat">
+          <span class="ofc-stat-label">Spent</span>
+          <span class="ofc-stat-val" style="color:${spendColor(fan.lifetimeValue)}">${formatSpend(fan.lifetimeValue)}</span>
+        </div>
+        <div class="ofc-stat-sep"></div>
+        <div class="ofc-stat">
+          <span class="ofc-stat-label">Subbed</span>
+          <span class="ofc-stat-val">${formatSubDuration(fan.firstSeen)}</span>
+        </div>
+        <div class="ofc-stat-sep"></div>
+        <div class="ofc-stat" title="${escapeHtml(bpTip)}">
+          <span class="ofc-stat-label">Buying power</span>
+          <div class="ofc-bp-val">
+            <span class="ofc-bp-dots" style="color:${bpColor}">${dots}</span>
+            <span class="ofc-bp-frac" style="color:${bpColor}">${score}/5</span>
+          </div>
+        </div>
+      </div>
+      ${metaRow}
     `;
     ctx.style.display = 'flex';
 
@@ -372,7 +416,13 @@ export class UIOverlay {
       const pill = document.createElement('span');
       pill.className = 'ofc-ctx-online';
       pill.textContent = '● online';
-      ctx.appendChild(pill);
+      // Place pill in the meta row alongside tags, or append as its own row
+      const meta = ctx.querySelector<HTMLElement>('.ofc-fan-meta');
+      if (meta) {
+        meta.prepend(pill);
+      } else {
+        ctx.appendChild(pill);
+      }
     } else if (!online && existing) {
       existing.remove();
     }
