@@ -383,15 +383,6 @@ export class UIOverlay {
     const bpTip = `${score}/5 · ${fan.ppvHistory.length} PPV purchase${fan.ppvHistory.length === 1 ? '' : 's'}`;
     const dots = '●'.repeat(score) + '○'.repeat(5 - score);
 
-    const tagPills = fan.tags
-      .slice(0, 3)
-      .map((t) => `<span class="ofc-ctx-tag">${escapeHtml(t)}</span>`)
-      .join('');
-
-    const metaRow = fan.tags.length > 0
-      ? `<div class="ofc-fan-meta">${tagPills}</div>`
-      : '';
-
     ctx.innerHTML = `
       <div class="ofc-fan-stats">
         <div class="ofc-stat">
@@ -412,7 +403,6 @@ export class UIOverlay {
           </div>
         </div>
       </div>
-      ${metaRow}
     `;
     ctx.style.display = 'flex';
 
