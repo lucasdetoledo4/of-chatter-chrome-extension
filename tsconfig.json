@@ -13,6 +13,7 @@
     "background/**/*.ts",
     "content/**/*.ts",
     "utils/**/*.ts",
-    "mock/**/*.ts"
+    "mock/**/*.ts",
+    "popup/**/*.ts"
   ]
 }
