@@ -67,6 +67,12 @@ export const PROFILE_PRUNE_DAYS = 90;
 
 export const MAX_HINT_INDICES = 3;
 
+// ─── Trigger word detection ───────────────────────────────────────────────────
+// Fan messages matching this pattern signal purchase intent.
+// Auto-switches to Sell mode so the AI immediately generates upsell suggestions.
+export const TRIGGER_SELL_RE = /\b(customs?|menu|price|how\s+much|costs?|rates?|fee|buy|purchase|order|request|catalogue|catalog|unlock|ppv|pay\s+per\s+view|send\s+me|what\s+do\s+you\s+offer|what('s|s)\s+(included|available))\b/i;
+export const TRIGGER_NOTICE_MS = 4000;
+
 // ─── Routing ──────────────────────────────────────────────────────────────────
 
 export const CHAT_URL_PATTERNS     = ['/my/chats/', '/messages/'];

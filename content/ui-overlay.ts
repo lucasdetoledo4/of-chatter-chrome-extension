@@ -15,6 +15,7 @@ import {
   NOTES_SAVED_MS,
   DROP_GUARD_MS,
   HISTORY_MAX_SETS,
+  TRIGGER_NOTICE_MS,
 } from '../utils/constants';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -182,8 +183,12 @@ export class UIOverlay {
       <span class="ofc-notes-saved">Saved</span>
     `;
 
+    const triggerNotice = document.createElement('div');
+    triggerNotice.id = 'ofc-trigger-notice';
+
     panel.appendChild(header);
     panel.appendChild(fanCtx);
+    panel.appendChild(triggerNotice);
     panel.appendChild(body);
     panel.appendChild(notesSection);
     shadow.appendChild(panel);
@@ -371,6 +376,15 @@ export class UIOverlay {
     } else if (!online && existing) {
       existing.remove();
     }
+  }
+
+  /** Show a brief banner explaining an auto-mode-switch triggered by a fan keyword. */
+  showTriggerNotice(reason: string): void {
+    const el = this.shadow?.querySelector<HTMLElement>('#ofc-trigger-notice');
+    if (!el) return;
+    el.textContent = `⚡ Switched to Sell · ${reason}`;
+    el.classList.add('visible');
+    setTimeout(() => el.classList.remove('visible'), TRIGGER_NOTICE_MS);
   }
 
   remove(): void {
