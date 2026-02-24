@@ -13,6 +13,7 @@ import {
   MODEL_SONNET,
   ANTHROPIC_API_URL,
   ANTHROPIC_API_VERSION,
+  ANTHROPIC_BETA_CACHE,
   ANTHROPIC_MAX_TOKENS,
   LONG_CONV_THRESHOLD,
   API_RETRY_DELAYS,
@@ -81,7 +82,7 @@ async function handleMessage(
         ? MODEL_SONNET
         : await getModel();
 
-    const rawText = await callAnthropicApi({ apiKey, system, user, model });
+    const rawText = await callAnthropicApi({ apiKey, system, user, model, cacheSystem: true });
     const suggestions = parseSuggestions(rawText);
 
     return { success: true, suggestions };
@@ -124,28 +125,42 @@ interface CallApiParams {
   system: string;
   user: string;
   model: string;
+  /** Wrap the system prompt as a cached content block (prompt caching beta). */
+  cacheSystem?: boolean;
 }
 
 async function callAnthropicApi(params: CallApiParams): Promise<string> {
-  const { apiKey, system, user, model } = params;
+  const { apiKey, system, user, model, cacheSystem = false } = params;
+
+  // When caching, system must be a structured array with cache_control on the
+  // last block. The API caches the prefix up to (and including) that block.
+  // Cache TTL is 5 minutes — hits cost ~10% of normal input token price.
+  const systemPayload: AnthropicApiRequest['system'] = cacheSystem
+    ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
+    : system;
 
   const body: AnthropicApiRequest = {
     model,
     max_tokens: ANTHROPIC_MAX_TOKENS,
     temperature: 1.0, // max diversity — safe with our structured JSON output contract
-    system,
+    system: systemPayload,
     messages: [{ role: 'user', content: user }],
   };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': ANTHROPIC_API_VERSION,
+    'anthropic-dangerous-direct-browser-access': 'true',
+  };
+  if (cacheSystem) {
+    headers['anthropic-beta'] = ANTHROPIC_BETA_CACHE;
+  }
 
   const fetchOnce = () =>
     fetch(ANTHROPIC_API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': ANTHROPIC_API_VERSION,
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -172,6 +187,16 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
   }
 
   const data = (await response.json()) as AnthropicApiResponse;
+
+  // Log cache stats so you can verify caching is working in the SW console.
+  // First request: cache_creation_input_tokens > 0, cache_read = 0.
+  // Subsequent requests within 5min: cache_read_input_tokens > 0.
+  const { input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens } = data.usage;
+  console.log(
+    `[OFC SW] tokens — in: ${input_tokens}, out: ${output_tokens}` +
+    (cache_creation_input_tokens ? `, cache_write: ${cache_creation_input_tokens}` : '') +
+    (cache_read_input_tokens     ? `, cache_read: ${cache_read_input_tokens}`      : '')
+  );
 
   const textBlock = data.content.find((b) => b.type === 'text');
   if (!textBlock) {

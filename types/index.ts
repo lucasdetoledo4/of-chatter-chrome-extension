@@ -114,11 +114,18 @@ export interface AnthropicMessage {
   content: string;
 }
 
+// Structured system block — required when using prompt caching.
+export interface AnthropicSystemBlock {
+  type: 'text';
+  text: string;
+  cache_control?: { type: 'ephemeral' };
+}
+
 export interface AnthropicApiRequest {
   model: string;
   max_tokens: number;
   temperature?: number;
-  system: string;
+  system: string | AnthropicSystemBlock[];
   messages: AnthropicMessage[];
 }
 
@@ -137,6 +144,8 @@ export interface AnthropicApiResponse {
   usage: {
     input_tokens: number;
     output_tokens: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
   };
 }
 
