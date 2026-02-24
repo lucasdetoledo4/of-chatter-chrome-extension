@@ -1,11 +1,8 @@
 import type { FanProfile, FanProfileUpdate, CreatorProfile, CreatorAccount } from '../types/index';
-
-const FAN_KEY_PREFIX = 'fan:';
-// Prune profiles not seen in this many days
-const PRUNE_AFTER_DAYS = 90;
+import { StorageKey, PROFILE_PRUNE_DAYS } from './constants';
 
 function fanKey(fanId: string): string {
-  return `${FAN_KEY_PREFIX}${fanId}`;
+  return `${StorageKey.FanPrefix}${fanId}`;
 }
 
 export async function getFanProfile(fanId: string): Promise<FanProfile | null> {
@@ -43,7 +40,7 @@ export async function upsertFanProfile(
 export async function getAllFanProfiles(): Promise<FanProfile[]> {
   const all = await chrome.storage.local.get(null);
   return Object.entries(all)
-    .filter(([key]) => key.startsWith(FAN_KEY_PREFIX))
+    .filter(([key]) => key.startsWith(StorageKey.FanPrefix))
     .map(([, value]) => value as FanProfile);
 }
 
@@ -53,10 +50,8 @@ export async function deleteFanProfile(fanId: string): Promise<void> {
 
 // ─── Creator Profile ──────────────────────────────────────────────────────────
 
-const CREATOR_KEY_PREFIX = 'creator:';
-
 function creatorKey(creatorId: string): string {
-  return `${CREATOR_KEY_PREFIX}${creatorId}`;
+  return `${StorageKey.CreatorPrefix}${creatorId}`;
 }
 
 export async function getCreatorProfile(creatorId: string): Promise<CreatorProfile | null> {
@@ -90,36 +85,36 @@ export async function upsertCreatorProfile(
 // ─── Creator Accounts ─────────────────────────────────────────────────────────
 
 export async function getCreators(): Promise<CreatorAccount[]> {
-  const r = await chrome.storage.sync.get('CREATORS');
-  return (r['CREATORS'] as CreatorAccount[]) ?? [];
+  const r = await chrome.storage.sync.get(StorageKey.Creators);
+  return (r[StorageKey.Creators] as CreatorAccount[]) ?? [];
 }
 
 export async function upsertCreatorAccount(account: CreatorAccount): Promise<void> {
   const list = await getCreators();
   const idx = list.findIndex((c) => c.id === account.id);
   if (idx >= 0) list[idx] = account; else list.push(account);
-  await chrome.storage.sync.set({ CREATORS: list });
+  await chrome.storage.sync.set({ [StorageKey.Creators]: list });
 }
 
 export async function deleteCreatorAccount(id: string): Promise<void> {
   const list = await getCreators();
-  await chrome.storage.sync.set({ CREATORS: list.filter((c) => c.id !== id) });
+  await chrome.storage.sync.set({ [StorageKey.Creators]: list.filter((c) => c.id !== id) });
 }
 
 export async function getActiveCreatorId(): Promise<string | undefined> {
-  const r = await chrome.storage.sync.get('ACTIVE_CREATOR_ID');
-  return r['ACTIVE_CREATOR_ID'] as string | undefined;
+  const r = await chrome.storage.sync.get(StorageKey.ActiveCreatorId);
+  return r[StorageKey.ActiveCreatorId] as string | undefined;
 }
 
 // ─── Fan Profile ──────────────────────────────────────────────────────────────
 
 /**
- * Remove fan profiles that haven't been seen in PRUNE_AFTER_DAYS.
+ * Remove fan profiles that haven't been seen in PROFILE_PRUNE_DAYS.
  * Called on extension install/update to keep storage under the 10MB quota.
  */
 export async function pruneOldProfiles(): Promise<number> {
   const profiles = await getAllFanProfiles();
-  const cutoff = Date.now() - PRUNE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - PROFILE_PRUNE_DAYS * 24 * 60 * 60 * 1000;
   const stale = profiles.filter(
     (p) => new Date(p.lastSeen).getTime() < cutoff
   );

@@ -8,11 +8,17 @@ import type {
 } from '../types/index';
 import { buildSuggestionPrompt } from '../utils/prompt-builder';
 import { pruneOldProfiles } from '../utils/storage';
-
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
-const FALLBACK_MODEL = 'claude-sonnet-4-6';
-// Threshold: use fallback model for long conversations
-const LONG_CONVERSATION_THRESHOLD = 30;
+import {
+  MODEL_HAIKU,
+  MODEL_SONNET,
+  ANTHROPIC_API_URL,
+  ANTHROPIC_API_VERSION,
+  ANTHROPIC_MAX_TOKENS,
+  LONG_CONV_THRESHOLD,
+  API_RETRY_DELAYS,
+  CREATOR_STYLE_MAX_CHARS,
+  StorageKey,
+} from '../utils/constants';
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -71,8 +77,8 @@ async function handleMessage(
 
     // Use fallback model for long/complex conversations
     const model =
-      conversation.length > LONG_CONVERSATION_THRESHOLD
-        ? FALLBACK_MODEL
+      conversation.length > LONG_CONV_THRESHOLD
+        ? MODEL_SONNET
         : await getModel();
 
     const rawText = await callAnthropicApi({ apiKey, system, user, model });
@@ -85,8 +91,8 @@ async function handleMessage(
     const apiKey = await getApiKey();
     const system = `You are a writing style analyst. Describe a creator's messaging style in 3-4 sentences covering: emoji usage, sentence length and structure, tone, characteristic words or phrases, and how they open messages. Be specific — this will train an AI to mimic their voice.`;
     const user = `Analyse these messages:\n${request.creatorMessages.map((m, i) => `${i + 1}. "${m}"`).join('\n')}`;
-    const style = await callAnthropicApi({ apiKey, system, user, model: DEFAULT_MODEL });
-    return { success: true, suggestions: [], writingStyle: style.slice(0, 600) };
+    const style = await callAnthropicApi({ apiKey, system, user, model: MODEL_HAIKU });
+    return { success: true, suggestions: [], writingStyle: style.slice(0, CREATOR_STYLE_MAX_CHARS) };
   }
 
   // Dead code path — future request types handled here via discriminated union
@@ -96,7 +102,7 @@ async function handleMessage(
 // ─── Storage Helpers ──────────────────────────────────────────────────────────
 
 async function getApiKey(): Promise<string> {
-  const result = await chrome.storage.sync.get('ANTHROPIC_API_KEY') as SyncStorageSchema;
+  const result = await chrome.storage.sync.get(StorageKey.ApiKey) as SyncStorageSchema;
   const key = result.ANTHROPIC_API_KEY;
   if (!key) {
     throw new Error(
@@ -107,8 +113,8 @@ async function getApiKey(): Promise<string> {
 }
 
 async function getModel(): Promise<string> {
-  const result = await chrome.storage.sync.get('DEFAULT_MODEL') as SyncStorageSchema;
-  return result.DEFAULT_MODEL ?? DEFAULT_MODEL;
+  const result = await chrome.storage.sync.get(StorageKey.DefaultModel) as SyncStorageSchema;
+  return result.DEFAULT_MODEL ?? MODEL_HAIKU;
 }
 
 // ─── Anthropic API ────────────────────────────────────────────────────────────
@@ -125,19 +131,19 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
 
   const body: AnthropicApiRequest = {
     model,
-    max_tokens: 1024,
+    max_tokens: ANTHROPIC_MAX_TOKENS,
     temperature: 1.0, // max diversity — safe with our structured JSON output contract
     system,
     messages: [{ role: 'user', content: user }],
   };
 
   const fetchOnce = () =>
-    fetch('https://api.anthropic.com/v1/messages', {
+    fetch(ANTHROPIC_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': ANTHROPIC_API_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify(body),
@@ -147,8 +153,7 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
 
   // Retry with exponential backoff on 529 (overloaded) and 5xx transient errors.
   // 4xx errors (bad key, invalid request) are not retried — they won't recover.
-  const RETRY_DELAYS = [1000, 2000, 4000];
-  for (const delay of RETRY_DELAYS) {
+  for (const delay of API_RETRY_DELAYS) {
     if (response.ok) break;
     if (response.status !== 529 && response.status < 500) break;
     await new Promise((r) => setTimeout(r, delay));

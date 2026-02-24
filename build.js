@@ -42,17 +42,30 @@ const mockPromptBuilderBuild = {
   target: 'es2020',
 };
 
+// Popup: bundle popup.ts (with imports from utils/constants) into popup.js.
+// Output goes directly into popup/ so popup.html can load it without a dist step.
+const popupBuild = {
+  ...baseOptions,
+  entryPoints: ['popup/popup.ts'],
+  outfile: 'popup/popup.js',
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2020',
+};
+
 if (isWatch) {
   const swCtx = await esbuild.context(serviceWorkerBuild);
   const csCtx = await esbuild.context(contentScriptBuild);
   const pbCtx = await esbuild.context(mockPromptBuilderBuild);
-  await Promise.all([swCtx.watch(), csCtx.watch(), pbCtx.watch()]);
+  const ppCtx = await esbuild.context(popupBuild);
+  await Promise.all([swCtx.watch(), csCtx.watch(), pbCtx.watch(), ppCtx.watch()]);
   console.log('Watching for changes...');
 } else {
   await Promise.all([
     esbuild.build(serviceWorkerBuild),
     esbuild.build(contentScriptBuild),
     esbuild.build(mockPromptBuilderBuild),
+    esbuild.build(popupBuild),
   ]);
   console.log('Build complete.');
 }

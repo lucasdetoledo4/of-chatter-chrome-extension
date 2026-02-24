@@ -1,4 +1,5 @@
 import type { ConversationMessage } from '../types/index';
+import { PPV_PRICE_MAX } from '../utils/constants';
 
 /**
  * Find the container that holds chat messages.
@@ -258,7 +259,7 @@ export function scrapePpvPurchases(): ScrapedPpv[] {
     const match = text.match(/\$(\d+(?:\.\d{1,2})?)/);
     if (!match) return;
     const price = parseFloat(match[1]);
-    if (price <= 0 || price > 500) return; // sanity bounds — ignore noise
+    if (price <= 0 || price > PPV_PRICE_MAX) return; // sanity bounds — ignore noise
 
     // Use a data attribute for the stable ID if available, otherwise derive one
     const dataId =
