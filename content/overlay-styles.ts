@@ -71,7 +71,7 @@ export const STYLES = `
   .ofc-creator-btn:hover { background: #f1f5f9; }
 
   #ofc-creator-name {
-    font-size: 10.5px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.09em;
     text-transform: uppercase;
@@ -95,7 +95,7 @@ export const STYLES = `
 
   .ofc-creator-row {
     padding: 9px 14px;
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -112,12 +112,12 @@ export const STYLES = `
   }
 
   .ofc-creator-check {
-    font-size: 11px;
+    font-size: 12px;
     color: #7c3aed;
   }
 
   #ofc-count {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 400;
     color: #94a3b8;
     letter-spacing: 0;
@@ -156,7 +156,7 @@ export const STYLES = `
   }
 
   /* prev/next use text arrows, not SVG — restore normal line-height */
-  #ofc-prev, #ofc-next { font-size: 13px; line-height: 1; }
+  #ofc-prev, #ofc-next { font-size: 14px; line-height: 1; }
 
   /* Regen in-progress: dim suggestions, keep them visible while waiting */
   #ofc-body.regen-loading { opacity: 0.38; pointer-events: none; transition: opacity 0.15s; }
@@ -165,7 +165,7 @@ export const STYLES = `
   /* ── Trigger-word auto-switch notice ─────────────────────── */
   #ofc-trigger-notice {
     display: none;
-    font-size: 10.5px;
+    font-size: 12px;
     color: #92400e;
     background: #fef3c7;
     border-left: 3px solid #f59e0b;
@@ -181,7 +181,7 @@ export const STYLES = `
   }
 
   .ofc-mode-btn {
-    font-size: 9.5px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
     padding: 3px 8px;
@@ -233,7 +233,7 @@ export const STYLES = `
     gap: 10px;
     padding: 13px 14px;
     color: #64748b;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .ofc-spinner {
@@ -255,7 +255,7 @@ export const STYLES = `
     gap: 8px;
     padding: 12px 14px;
     color: #dc2626;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.55;
   }
 
@@ -322,7 +322,7 @@ export const STYLES = `
   .ofc-badge {
     display: inline-flex;
     align-items: center;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -332,7 +332,7 @@ export const STYLES = `
   }
 
   .ofc-use-btn {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     color: #94a3b8;
     background: none;
@@ -377,7 +377,7 @@ export const STYLES = `
 
   /* ── Keyboard shortcut hints ─────────────────────── */
   .ofc-kbd {
-    font-size: 9px;
+    font-size: 11px;
     color: #94a3b8;
     background: #f1f5f9;
     border: 1px solid #e2e8f0;
@@ -392,7 +392,7 @@ export const STYLES = `
 
   .ofc-text {
     color: #334155;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
     word-break: break-word;
   }
@@ -435,7 +435,7 @@ export const STYLES = `
   }
 
   .ofc-stat-label {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -443,7 +443,7 @@ export const STYLES = `
   }
 
   .ofc-stat-val {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: #475569;
   }
@@ -455,13 +455,13 @@ export const STYLES = `
   }
 
   .ofc-bp-dots {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 1.5px;
     line-height: 1;
   }
 
   .ofc-bp-frac {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 1;
   }
@@ -474,7 +474,7 @@ export const STYLES = `
   }
 
   .ofc-ctx-tag {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -485,7 +485,7 @@ export const STYLES = `
   }
 
   .ofc-ctx-online {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -507,7 +507,7 @@ export const STYLES = `
 
   .ofc-notes-label {
     display: block;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -521,7 +521,7 @@ export const STYLES = `
     border: 1.5px solid #e2e8f0;
     border-radius: 6px;
     color: #475569;
-    font-size: 12px;
+    font-size: 13px;
     font-family: inherit;
     line-height: 1.5;
     padding: 5px 8px;
@@ -543,7 +543,7 @@ export const STYLES = `
     position: absolute;
     right: 10px;
     bottom: 10px;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
