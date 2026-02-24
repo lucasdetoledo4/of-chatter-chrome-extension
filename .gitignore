@@ -1,4 +1,32 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 *.js.map
+
+# popup/popup.js is a build artifact — source is popup/popup.ts
+popup/popup.js
+popup/popup.js.map
+
+# Bun lockfile (binary, not human-readable)
 bun.lockb
+
+# Claude Code local settings
+.claude/
+
+# Internal planning / session docs not relevant to contributors
+CLAUDE.md
+SKILLS.md
+tasks/
+SUGGESTIONS.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
