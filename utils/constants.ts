@@ -20,9 +20,10 @@ export const MODEL_SONNET = 'claude-sonnet-4-6';
 
 // ─── Anthropic API ────────────────────────────────────────────────────────────
 
-export const ANTHROPIC_API_URL     = 'https://api.anthropic.com/v1/messages';
-export const ANTHROPIC_API_VERSION = '2023-06-01';
-export const ANTHROPIC_MAX_TOKENS  = 1024;
+export const ANTHROPIC_API_URL          = 'https://api.anthropic.com/v1/messages';
+export const ANTHROPIC_API_VERSION      = '2023-06-01';
+export const ANTHROPIC_MAX_TOKENS       = 1024;
+export const ANTHROPIC_BETA_CACHE       = 'prompt-caching-2024-07-31';
 export const LONG_CONV_THRESHOLD   = 30;
 export const API_RETRY_DELAYS: number[] = [1000, 2000, 4000];
 
@@ -80,4 +81,5 @@ export const LEGACY_PLACEHOLDER_RE = /^(Creator \d+|New Creator)$/;
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 
-export const PANEL_HOST_ID = 'ofc-suggestion-host';
+export const PANEL_HOST_ID       = 'ofc-suggestion-host';
+export const PANEL_POSITION_KEY  = 'ofc_panel_pos';
