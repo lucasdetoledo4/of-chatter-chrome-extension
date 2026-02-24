@@ -404,25 +404,74 @@ export const STYLES = `
   /* ── Fan context strip ──────────────────────────────── */
   #ofc-fan-ctx {
     display: none;
-    align-items: center;
+    flex-direction: column;
     gap: 6px;
-    padding: 5px 12px;
+    padding: 8px 12px;
     background: #f1f5f9;
     border-bottom: 1px solid #e2e8f0;
-    font-size: 11px;
-    flex-wrap: wrap;
   }
 
   #ofc-panel.collapsed #ofc-fan-ctx { display: none !important; }
 
-  .ofc-ctx-spend {
-    font-weight: 600;
-    letter-spacing: 0.01em;
+  .ofc-fan-stats {
+    display: flex;
+    align-items: stretch;
   }
 
-  .ofc-ctx-sep { color: #cbd5e1; }
+  .ofc-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 12px;
+  }
 
-  .ofc-ctx-dur { color: #94a3b8; }
+  .ofc-stat:first-child { padding-left: 0; }
+
+  .ofc-stat-sep {
+    width: 1px;
+    background: #e2e8f0;
+    margin: 1px 0;
+    flex-shrink: 0;
+  }
+
+  .ofc-stat-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .ofc-stat-val {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .ofc-bp-val {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ofc-bp-dots {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    line-height: 1;
+  }
+
+  .ofc-bp-frac {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .ofc-fan-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
 
   .ofc-ctx-tag {
     font-size: 9px;
