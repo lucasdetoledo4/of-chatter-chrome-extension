@@ -155,6 +155,9 @@ export const STYLES = `
     animation: ofc-spin 0.65s linear infinite;
   }
 
+  /* prev/next use text arrows, not SVG — restore normal line-height */
+  #ofc-prev, #ofc-next { font-size: 13px; line-height: 1; }
+
   /* Regen in-progress: dim suggestions, keep them visible while waiting */
   #ofc-body.regen-loading { opacity: 0.38; pointer-events: none; transition: opacity 0.15s; }
   #ofc-body { transition: opacity 0.2s; }
