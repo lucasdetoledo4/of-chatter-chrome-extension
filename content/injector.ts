@@ -45,6 +45,7 @@ import {
   MESSAGE_DEBOUNCE_MS,
   ONLINE_POLL_MS,
   CHAT_URL_PATTERNS,
+  TRIGGER_SELL_RE,
   StorageKey,
 } from '../utils/constants';
 
@@ -201,6 +202,23 @@ async function handleNewMessage(
 
   // Kick off style analysis in background if we have enough messages
   triggerStyleAnalysisIfNeeded(creatorRealMessages);
+
+  // Auto-switch to Sell mode when the fan's message contains high-intent keywords.
+  // Only fires if not already in Sell mode — never overrides a chatter's manual selection.
+  if (msg.role === 'fan' && activeSuggestionMode !== 'sell') {
+    const triggerMatch = msg.text.match(TRIGGER_SELL_RE);
+    if (triggerMatch) {
+      const keyword = triggerMatch[0].toLowerCase();
+      activeSuggestionMode = 'sell';
+      overlay.setMode('sell');
+      overlay.showTriggerNotice(`"${keyword}" detected`);
+      void chrome.storage.local.set({
+        [StorageKey.SuggestionMode]: 'sell',
+        [StorageKey.FanModePrefix + fanId]: 'sell',
+      });
+      console.log(`[OFC] Auto-switched to Sell mode — trigger word: "${keyword}"`);
+    }
+  }
 
   const req: GetSuggestionsRequest = {
     type: 'GET_SUGGESTIONS',

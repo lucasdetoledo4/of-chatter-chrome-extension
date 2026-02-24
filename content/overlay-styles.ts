@@ -162,6 +162,17 @@ export const STYLES = `
   #ofc-body.regen-loading { opacity: 0.38; pointer-events: none; transition: opacity 0.15s; }
   #ofc-body { transition: opacity 0.2s; }
 
+  /* ── Trigger-word auto-switch notice ─────────────────────── */
+  #ofc-trigger-notice {
+    display: none;
+    font-size: 10.5px;
+    color: #92400e;
+    background: #fef3c7;
+    border-left: 3px solid #f59e0b;
+    padding: 4px 10px;
+  }
+  #ofc-trigger-notice.visible { display: block; }
+
   /* ── Mode toggle ─────────────────────────────────────────── */
   #ofc-modes {
     display: flex;
