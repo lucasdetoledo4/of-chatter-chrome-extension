@@ -10,6 +10,7 @@ import {
 import { STYLES } from './overlay-styles';
 import {
   PANEL_HOST_ID,
+  PANEL_POSITION_KEY,
   REGEN_FEEDBACK_MS,
   REGEN_COOLDOWN_MS,
   NOTES_SAVED_MS,
@@ -95,6 +96,11 @@ export class UIOverlay {
   private _regenStartedAt = 0;
   private _history: Suggestion[][] = [];
   private _historyIdx = -1;
+  private _isDragging = false;
+  private _dragOffsetX = 0;
+  private _dragOffsetY = 0;
+  private _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private _dragUpHandler: ((e: MouseEvent) => void) | null = null;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
@@ -143,7 +149,9 @@ export class UIOverlay {
       // Mock harness: inject inside the designated container
       anchor.appendChild(host);
     } else {
-      anchor.insertAdjacentElement(insertPosition, host);
+      // Inject into body so the fixed-position panel is relative to the viewport,
+      // not to whatever stacking context OF's chat containers create.
+      document.body.appendChild(host);
     }
 
     const shadow = host.attachShadow({ mode: 'open' });
@@ -301,6 +309,16 @@ export class UIOverlay {
     document.addEventListener('keydown', keydownHandler);
     this._keydownHandler = keydownHandler;
 
+    // Wire drag-to-reposition — mousedown on header row, but not on buttons
+    const headerRowEl = header.querySelector<HTMLElement>('#ofc-header-row')!;
+    headerRowEl.addEventListener('mousedown', (e) => {
+      if ((e.target as Element).closest('button')) return;
+      this._startDrag(e);
+    });
+
+    // Restore last saved position (async — panel shows at default first, then snaps)
+    this._loadSavedPosition();
+
     // Apply any creator data that was set before the shadow DOM existed
     this._syncCreatorBtn();
   }
@@ -446,6 +464,15 @@ export class UIOverlay {
       document.removeEventListener('click', this._docClickHandler);
       this._docClickHandler = null;
     }
+    if (this._dragMoveHandler) {
+      document.removeEventListener('mousemove', this._dragMoveHandler);
+      this._dragMoveHandler = null;
+    }
+    if (this._dragUpHandler) {
+      document.removeEventListener('mouseup', this._dragUpHandler);
+      this._dragUpHandler = null;
+    }
+    document.body.style.userSelect = ''; // in case removed mid-drag
     this.host?.remove();
     this.host = null;
     this.shadow = null;
@@ -488,11 +515,7 @@ export class UIOverlay {
     const histTotal = this._history.length;
     const histPos = this._historyIdx + 1;
     const count = suggestions.length;
-    this.setCount(
-      histTotal > 1
-        ? `${histPos}/${histTotal}`
-        : count > 0 ? `${count} suggestion${count === 1 ? '' : 's'}` : ''
-    );
+    this.setCount(histTotal > 1 ? `${histPos}/${histTotal}` : '');
 
     const modeTiers = MODE_TIER_CONFIG[this.activeMode];
     const cardsHtml = suggestions
@@ -633,5 +656,66 @@ export class UIOverlay {
     const body = this.panel?.querySelector<HTMLElement>('#ofc-body');
     if (!body) return;
     body.innerHTML = html;
+  }
+
+  // ─── Drag to reposition ───────────────────────────────────
+
+  private _startDrag(e: MouseEvent): void {
+    if (!this.host) return;
+    e.preventDefault();
+    const rect = this.host.getBoundingClientRect();
+    this._dragOffsetX = e.clientX - rect.left;
+    this._dragOffsetY = e.clientY - rect.top;
+    this._isDragging = true;
+    // Switch from right-anchored to left-anchored so dragging works in both directions
+    this.host.style.right = '';
+    this.host.style.left = `${rect.left}px`;
+    this.host.style.top = `${rect.top}px`;
+    document.body.style.userSelect = 'none';
+    const headerRow = this.shadow?.querySelector<HTMLElement>('#ofc-header-row');
+    if (headerRow) headerRow.style.cursor = 'grabbing';
+    this._dragMoveHandler = (ev: MouseEvent) => this._onDragMove(ev);
+    this._dragUpHandler = (ev: MouseEvent) => this._onDragUp(ev);
+    document.addEventListener('mousemove', this._dragMoveHandler);
+    document.addEventListener('mouseup', this._dragUpHandler);
+  }
+
+  private _onDragMove(e: MouseEvent): void {
+    if (!this._isDragging || !this.host) return;
+    const panelW = this.host.offsetWidth;
+    const panelH = this.host.offsetHeight;
+    const x = Math.max(0, Math.min(e.clientX - this._dragOffsetX, window.innerWidth - panelW));
+    const y = Math.max(0, Math.min(e.clientY - this._dragOffsetY, window.innerHeight - panelH));
+    this.host.style.left = `${x}px`;
+    this.host.style.top = `${y}px`;
+  }
+
+  private _onDragUp(_e: MouseEvent): void {
+    if (!this._isDragging || !this.host) return;
+    this._isDragging = false;
+    document.body.style.userSelect = '';
+    const headerRow = this.shadow?.querySelector<HTMLElement>('#ofc-header-row');
+    if (headerRow) headerRow.style.cursor = '';
+    if (this._dragMoveHandler) document.removeEventListener('mousemove', this._dragMoveHandler);
+    if (this._dragUpHandler) document.removeEventListener('mouseup', this._dragUpHandler);
+    this._dragMoveHandler = null;
+    this._dragUpHandler = null;
+    const x = parseFloat(this.host.style.left) || 0;
+    const y = parseFloat(this.host.style.top) || 0;
+    void chrome.storage.local.set({ [PANEL_POSITION_KEY]: { x, y } });
+  }
+
+  private _loadSavedPosition(): void {
+    if (!this.host) return;
+    void chrome.storage.local.get(PANEL_POSITION_KEY).then((result) => {
+      const pos = result[PANEL_POSITION_KEY] as { x: number; y: number } | undefined;
+      if (!pos || !this.host) return;
+      const panelW = 460; // matches :host width in CSS
+      const x = Math.max(0, Math.min(pos.x, window.innerWidth - panelW));
+      const y = Math.max(0, Math.min(pos.y, window.innerHeight - 40));
+      this.host.style.right = '';
+      this.host.style.left = `${x}px`;
+      this.host.style.top = `${y}px`;
+    });
   }
 }
