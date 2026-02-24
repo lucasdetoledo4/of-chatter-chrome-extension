@@ -1,5 +1,6 @@
 import type { FanProfile, FanProfileUpdate, CreatorProfile, CreatorAccount } from '../types/index';
 import { StorageKey, PROFILE_PRUNE_DAYS } from './constants';
+import { computeAutoTags } from './auto-tagger';
 
 function fanKey(fanId: string): string {
   return `${StorageKey.FanPrefix}${fanId}`;
@@ -32,6 +33,8 @@ export async function upsertFanProfile(
         ppvHistory: update.ppvHistory ?? [],
         ...update,
       };
+
+  profile.tags = computeAutoTags(profile);
 
   await chrome.storage.local.set({ [fanKey(fanId)]: profile });
   return profile;

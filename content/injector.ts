@@ -25,6 +25,7 @@ import {
 import { pickVariationHint } from '../utils/variation-hints';
 import { scrapeCreatorProfile, scrapeCreatorFromNav, diagnoseProfileScraper } from './profile-scraper';
 import { findAnchorElement, insertIntoChat } from './chat-input';
+import { startInboxTagger, stopInboxTagger } from './inbox-tagger';
 import {
   getCreatorId,
   getCreatorProfile,
@@ -506,10 +507,22 @@ const navObserver = new MutationObserver(() => {
 
   navDebounceTimer = setTimeout(() => {
     if (isOnChatPage()) {
-      console.log('[OFC] SPA navigation to chat page — re-initializing.');
-      void initializeChatAssistant();
+      const fanId = extractFanIdFromUrl(location.pathname);
+      // Always keep inbox tagger running — left panel list stays visible in split view
+      startInboxTagger();
+      if (fanId) {
+        console.log('[OFC] SPA navigation to chat page — re-initializing.');
+        void initializeChatAssistant();
+      } else {
+        // Inbox only — tear down any open chat panel
+        overlay?.remove();
+        overlay = null;
+        lastRequest = null;
+        console.log('[OFC] SPA navigation to inbox.');
+      }
     } else {
-      // Remove the panel when navigating away from a chat page
+      // Navigated away from chats entirely — stop everything
+      stopInboxTagger();
       overlay?.remove();
       overlay = null;
       lastRequest = null;
@@ -556,7 +569,12 @@ navObserver.observe(document.body, { childList: true, subtree: true });
 
 // Initial page load
 if (isOnChatPage()) {
-  void initializeChatAssistant();
+  // Always start inbox tagger — left panel list is visible on all chat pages
+  startInboxTagger();
+  const _initialFanId = extractFanIdFromUrl(location.pathname);
+  if (_initialFanId) {
+    void initializeChatAssistant();
+  }
 }
 
 // ─── DevTools Diagnostic ──────────────────────────────────────────────────────

@@ -473,24 +473,6 @@ export const STYLES = `
     line-height: 1;
   }
 
-  .ofc-fan-meta {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-
-  .ofc-ctx-tag {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 1px 6px;
-    border-radius: 100px;
-    background: rgba(0, 0, 0, 0.05);
-    color: #64748b;
-  }
-
   .ofc-ctx-online {
     font-size: 11px;
     font-weight: 700;
