@@ -509,6 +509,11 @@ const navObserver = new MutationObserver(() => {
       console.log('[OFC] SPA navigation to chat page — re-initializing.');
       void initializeChatAssistant();
     } else {
+      // Remove the panel when navigating away from a chat page
+      overlay?.remove();
+      overlay = null;
+      lastRequest = null;
+
       // Opportunistically scrape creator profile data on profile pages
       const scraped = scrapeCreatorProfile();
       if (scraped) {
