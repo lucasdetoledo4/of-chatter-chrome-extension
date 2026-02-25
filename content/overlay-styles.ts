@@ -547,12 +547,17 @@ export const STYLES = `
   /* ── Resize handles ──────────────────────────────────── */
   .ofc-resize-handle {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    cursor: ew-resize;
     z-index: 2;
   }
-  .ofc-resize-handle-left  { left: -4px; }
-  .ofc-resize-handle-right { right: -4px; }
+  /* Left / right edges — stop short of all corners */
+  .ofc-resize-handle-left         { top: 12px; bottom: 12px; left: -4px; width: 8px; cursor: ew-resize; }
+  .ofc-resize-handle-right        { top: 12px; bottom: 12px; right: -4px; width: 8px; cursor: ew-resize; }
+  /* Top / bottom edges */
+  .ofc-resize-handle-top          { left: 12px; right: 12px; top: -4px; height: 8px; cursor: ns-resize; }
+  .ofc-resize-handle-bottom       { left: 12px; right: 12px; bottom: -4px; height: 8px; cursor: ns-resize; }
+  /* Corners */
+  .ofc-resize-handle-top-right    { right: -4px; top: -4px; width: 12px; height: 12px; cursor: nesw-resize; }
+  .ofc-resize-handle-top-left     { left: -4px;  top: -4px; width: 12px; height: 12px; cursor: nwse-resize; }
+  .ofc-resize-handle-bottom-right { right: -4px; bottom: -4px; width: 12px; height: 12px; cursor: nwse-resize; }
+  .ofc-resize-handle-bottom-left  { left: -4px;  bottom: -4px; width: 12px; height: 12px; cursor: nesw-resize; }
 `;
