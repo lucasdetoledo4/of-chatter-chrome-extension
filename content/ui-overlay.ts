@@ -104,10 +104,13 @@ export class UIOverlay {
   private _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
   private _dragUpHandler: ((e: MouseEvent) => void) | null = null;
   private _isResizing = false;
-  private _resizeDir: 'left' | 'right' = 'right';
+  private _resizeDir: 'left' | 'right' | 'top' | 'bottom' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' = 'right';
   private _resizeStartX = 0;
+  private _resizeStartY = 0;
   private _resizeStartW = 0;
+  private _resizeStartH = 0;
   private _resizeStartLeft = 0;
+  private _resizeStartTop = 0;
   private _resizeMoveHandler: ((e: MouseEvent) => void) | null = null;
   private _resizeUpHandler: ((e: MouseEvent) => void) | null = null;
 
@@ -234,8 +237,26 @@ export class UIOverlay {
     resizeLeft.className = 'ofc-resize-handle ofc-resize-handle-left';
     const resizeRight = document.createElement('div');
     resizeRight.className = 'ofc-resize-handle ofc-resize-handle-right';
+    const resizeTop = document.createElement('div');
+    resizeTop.className = 'ofc-resize-handle ofc-resize-handle-top';
+    const resizeBottom = document.createElement('div');
+    resizeBottom.className = 'ofc-resize-handle ofc-resize-handle-bottom';
+    const resizeTR = document.createElement('div');
+    resizeTR.className = 'ofc-resize-handle ofc-resize-handle-top-right';
+    const resizeTL = document.createElement('div');
+    resizeTL.className = 'ofc-resize-handle ofc-resize-handle-top-left';
+    const resizeBR = document.createElement('div');
+    resizeBR.className = 'ofc-resize-handle ofc-resize-handle-bottom-right';
+    const resizeBL = document.createElement('div');
+    resizeBL.className = 'ofc-resize-handle ofc-resize-handle-bottom-left';
     shadow.appendChild(resizeLeft);
     shadow.appendChild(resizeRight);
+    shadow.appendChild(resizeTop);
+    shadow.appendChild(resizeBottom);
+    shadow.appendChild(resizeTR);
+    shadow.appendChild(resizeTL);
+    shadow.appendChild(resizeBR);
+    shadow.appendChild(resizeBL);
 
     this.host = host;
     this.shadow = shadow;
@@ -336,6 +357,12 @@ export class UIOverlay {
     // Wire resize handles
     resizeLeft.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'left'); });
     resizeRight.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'right'); });
+    resizeTop.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'top'); });
+    resizeBottom.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'bottom'); });
+    resizeTR.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'top-right'); });
+    resizeTL.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'top-left'); });
+    resizeBR.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'bottom-right'); });
+    resizeBL.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'bottom-left'); });
 
     // Restore last saved position (async — panel shows at default first, then snaps)
     this._loadSavedPosition();
@@ -728,7 +755,7 @@ export class UIOverlay {
   private _loadSavedPosition(): void {
     if (!this.host) return;
     void chrome.storage.local.get(PANEL_POSITION_KEY).then((result) => {
-      const pos = result[PANEL_POSITION_KEY] as { x: number; y: number; w?: number } | undefined;
+      const pos = result[PANEL_POSITION_KEY] as { x: number; y: number; w?: number; h?: number } | undefined;
       if (!pos || !this.host) return;
       const w = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, pos.w ?? 460));
       const x = Math.max(0, Math.min(pos.x, window.innerWidth - w));
@@ -737,22 +764,29 @@ export class UIOverlay {
       this.host.style.left = `${x}px`;
       this.host.style.top = `${y}px`;
       this.host.style.width = `${w}px`;
+      if (pos.h && this.panel) {
+        this.panel.style.height = `${pos.h}px`;
+        this.panel.style.maxHeight = 'none';
+      }
     });
   }
 
   // ─── Resize by edge dragging ───────────────────────────
 
-  private _startResize(e: MouseEvent, dir: 'left' | 'right'): void {
-    if (!this.host) return;
+  private _startResize(e: MouseEvent, dir: 'left' | 'right' | 'top' | 'bottom' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'): void {
+    if (!this.host || !this.panel) return;
     const rect = this.host.getBoundingClientRect();
-    // Convert to left-anchored so width adjustments work in both directions
+    // Convert to left-anchored so horizontal adjustments work in both directions
     this.host.style.right = '';
     this.host.style.left = `${rect.left}px`;
     this._isResizing = true;
     this._resizeDir = dir;
     this._resizeStartX = e.clientX;
+    this._resizeStartY = e.clientY;
     this._resizeStartW = rect.width;
+    this._resizeStartH = this.panel.getBoundingClientRect().height;
     this._resizeStartLeft = rect.left;
+    this._resizeStartTop = rect.top;
     document.body.style.userSelect = 'none';
     this._resizeMoveHandler = (ev: MouseEvent) => this._onResizeMove(ev);
     this._resizeUpHandler = () => this._onResizeUp();
@@ -761,18 +795,39 @@ export class UIOverlay {
   }
 
   private _onResizeMove(e: MouseEvent): void {
-    if (!this._isResizing || !this.host) return;
-    const delta = e.clientX - this._resizeStartX;
-    if (this._resizeDir === 'right') {
-      const newW = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, this._resizeStartW + delta));
+    if (!this._isResizing || !this.host || !this.panel) return;
+    const dx = e.clientX - this._resizeStartX;
+    const dy = e.clientY - this._resizeStartY;
+    const dir = this._resizeDir;
+    const minH = 200;
+    const maxH = window.innerHeight - 32;
+
+    // Horizontal component
+    if (dir === 'right' || dir === 'bottom-right' || dir === 'top-right') {
+      const newW = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, this._resizeStartW + dx));
       this.host.style.width = `${newW}px`;
-    } else {
-      // Left edge drag: keep right edge fixed, move left edge
-      const newW = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, this._resizeStartW - delta));
+    } else if (dir === 'left' || dir === 'bottom-left' || dir === 'top-left') {
+      const newW = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, this._resizeStartW - dx));
       const rightEdge = this._resizeStartLeft + this._resizeStartW;
-      const newLeft = Math.max(0, rightEdge - newW);
       this.host.style.width = `${newW}px`;
-      this.host.style.left = `${newLeft}px`;
+      this.host.style.left = `${Math.max(0, rightEdge - newW)}px`;
+    }
+
+    // Bottom vertical component — keep top fixed, move bottom edge
+    if (dir === 'bottom' || dir === 'bottom-right' || dir === 'bottom-left') {
+      const newH = Math.max(minH, Math.min(maxH, this._resizeStartH + dy));
+      this.panel.style.height = `${newH}px`;
+      this.panel.style.maxHeight = 'none';
+    }
+
+    // Top vertical component — keep bottom edge fixed, move top edge
+    if (dir === 'top' || dir === 'top-right' || dir === 'top-left') {
+      const newH = Math.max(minH, Math.min(maxH, this._resizeStartH - dy));
+      const bottomEdge = this._resizeStartTop + this._resizeStartH;
+      const newTop = Math.max(0, bottomEdge - newH);
+      this.panel.style.height = `${newH}px`;
+      this.panel.style.maxHeight = 'none';
+      this.host.style.top = `${newTop}px`;
     }
   }
 
@@ -787,6 +842,7 @@ export class UIOverlay {
     const x = parseFloat(this.host.style.left) || 0;
     const y = parseFloat(this.host.style.top) || 0;
     const w = this.host.offsetWidth;
-    void chrome.storage.local.set({ [PANEL_POSITION_KEY]: { x, y, w } });
+    const h = this.panel ? parseFloat(this.panel.style.height) || 0 : 0;
+    void chrome.storage.local.set({ [PANEL_POSITION_KEY]: { x, y, w, h: h || undefined } });
   }
 }
