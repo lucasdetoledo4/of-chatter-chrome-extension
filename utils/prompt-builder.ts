@@ -27,26 +27,25 @@ export { pickVariationHint };
 function buildFanContext(fan: FanProfile): string {
   const parts: string[] = [];
 
-  // Spend tier with PPV price guidance so the model knows what to pitch
+  // Spend tier — tone guidance only, not a pitch script
   if (fan.lifetimeValue >= PPV_TIER_MID_MAX) {
-    parts.push('high-value spender (treat as VIP) — premium PPV $25–50+, exclusive/luxury framing');
+    parts.push('high-value spender — treat as VIP, luxury/exclusive framing if upsell arises naturally');
   } else if (fan.lifetimeValue >= PPV_TIER_LOW_MAX) {
-    parts.push('regular spender — PPV price range $10–25, mid-tier framing');
+    parts.push('regular spender — comfortable with paid content, mid-tier framing if upsell arises naturally');
   } else if (fan.lifetimeValue > 0) {
-    parts.push('low spender — introduce PPV gently, start at $5–10 to lower the barrier');
+    parts.push('has spent a little — still warming up; any upsell should feel like an invitation, not a pitch');
   } else {
-    // $0 spent — flag time-waster risk if message count is high
     if (fan.messageCount >= TIME_WASTER_MSGS) {
-      parts.push('has not spent yet — high message count with no purchase suggests time-waster; keep upsells brief and direct');
+      parts.push('has not spent yet despite many messages — keep upsells brief if at all; rapport first');
     } else {
-      parts.push('has not spent yet — conversion opportunity; start PPV at $5–10 to lower the barrier');
+      parts.push('has not spent yet — build trust and connection first; upsell only if it fits naturally');
     }
   }
 
-  // Recency signal — if the fan has been quiet, re-engagement tone first
+  // Recency signal
   const daysSinceLastSeen = Math.floor((Date.now() - new Date(fan.lastSeen).getTime()) / 86400000);
   if (daysSinceLastSeen >= QUIET_FAN_DAYS) {
-    parts.push(`been quiet for ${daysSinceLastSeen} day${daysSinceLastSeen === 1 ? '' : 's'} — re-engagement tone first, no hard sell`);
+    parts.push(`been quiet for ${daysSinceLastSeen} day${daysSinceLastSeen === 1 ? '' : 's'} — re-engagement tone, no sell`);
   }
 
   if (fan.tags.includes('whale')) parts.push('whale — responds well to exclusive/premium framing');
@@ -73,10 +72,10 @@ function buildModeTierInstructions(mode?: SuggestionMode): string {
 3. third — gentle nudge, give them an easy reason to reply`;
   }
   // Default: 'sell'
-  return `Generate exactly 3 replies. Each must have a clearly different approach:
-1. engage — build rapport, warmth, genuine connection. No sell at all.
-2. soft_upsell — natural, story-led nudge toward content. Never feels pushy.
-3. direct_upsell — clear call to action, confident, benefit-led. Still in-character.`;
+  return `Generate exactly 3 replies. All three MUST first respond to what the fan actually said — then differ in how far they go:
+1. engage — answer/acknowledge their message genuinely. Warmth, connection. Zero sell.
+2. soft_upsell — respond to their message first, then let a content nudge arise naturally from it.
+3. direct_upsell — respond to their message briefly, then a clear confident CTA. Never skips the response.`;
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -177,6 +176,7 @@ You are typing fast — on mobile or laptop, not drafting an essay.
 - Never use parentheses, semicolons, "--", or em dashes (—)
 
 ## Rules
+- ALWAYS address what the fan said first. A reply that ignores their message and jumps straight to selling feels robotic and breaks trust.
 - Each reply must sound DIFFERENT in structure, length, and opening. Never start two with the same word or phrase.
 - Stay fully in character. No corporate language, no filler phrases.
 - Vary sentence length. Mix short punchy lines with longer ones.
