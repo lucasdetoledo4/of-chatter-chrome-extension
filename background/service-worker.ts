@@ -197,7 +197,7 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
       const body = JSON.parse(errorText) as { error?: { message?: string } };
       if (body.error?.message) message = body.error.message;
     } catch { /* leave generic message */ }
-    if (response.status === 529) message = 'API overloaded — please try again in a moment';
+    if (response.status === 529) message = 'API overloaded — press ↺ or Alt+R to retry';
     throw new Error(message);
   }
 
