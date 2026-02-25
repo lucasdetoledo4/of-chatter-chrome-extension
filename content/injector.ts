@@ -377,8 +377,10 @@ async function initializeChatAssistant(): Promise<void> {
 
   overlay = new UIOverlay();
   overlay.setMode(activeSuggestionMode); // apply persisted mode before first inject
+  const currentOverlay = overlay;
   overlay.setInsertHandler((text) => {
-    insertIntoChat(text);
+    const result = insertIntoChat(text);
+    if (result === 'clipboard') currentOverlay.showClipboardNotice();
     void (async () => {
       const p = await getFanProfile(fanId);
       const recent = (p?.usedSuggestions ?? []).slice(-9);

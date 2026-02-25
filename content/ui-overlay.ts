@@ -499,6 +499,15 @@ export class UIOverlay {
     setTimeout(() => el.classList.remove('visible'), TRIGGER_NOTICE_MS);
   }
 
+  /** Show a brief notice when text was copied to clipboard instead of inserted. */
+  showClipboardNotice(): void {
+    const el = this.shadow?.querySelector<HTMLElement>('#ofc-trigger-notice');
+    if (!el) return;
+    el.textContent = 'Copied to clipboard — paste into chat (Ctrl+V)';
+    el.classList.add('visible');
+    setTimeout(() => el.classList.remove('visible'), 3_000);
+  }
+
   remove(): void {
     if (this._keydownHandler) {
       document.removeEventListener('keydown', this._keydownHandler);
