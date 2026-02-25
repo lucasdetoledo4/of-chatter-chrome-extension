@@ -225,14 +225,21 @@ async function _handleNewMessageInner(
     const triggerMatch = msg.text.match(TRIGGER_SELL_RE);
     if (triggerMatch) {
       const keyword = triggerMatch[0].toLowerCase();
+      const prevMode = activeSuggestionMode;
       activeSuggestionMode = 'sell';
       overlay.setMode('sell');
-      overlay.showTriggerNotice(`"${keyword}" detected`);
+      overlay.showTriggerNotice(`"${keyword}" detected`, () => {
+        activeSuggestionMode = prevMode;
+        overlay.setMode(prevMode);
+        void chrome.storage.local.set({
+          [StorageKey.SuggestionMode]: prevMode,
+          [StorageKey.FanModePrefix + fanId]: prevMode,
+        });
+      });
       void chrome.storage.local.set({
         [StorageKey.SuggestionMode]: 'sell',
         [StorageKey.FanModePrefix + fanId]: 'sell',
       });
-
     }
   }
 

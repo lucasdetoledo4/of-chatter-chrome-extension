@@ -176,8 +176,23 @@ export const STYLES = `
     background: #fef3c7;
     border-left: 3px solid #f59e0b;
     padding: 4px 10px;
+    align-items: center;
+    gap: 8px;
   }
-  #ofc-trigger-notice.visible { display: block; position: relative; z-index: 10; }
+  #ofc-trigger-notice.visible { display: flex; position: relative; z-index: 10; }
+  #ofc-trigger-notice .ofc-notice-text { flex: 1; }
+  #ofc-trigger-notice .ofc-undo-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid #d97706;
+    border-radius: 4px;
+    color: #92400e;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 1px 6px;
+    line-height: 1.4;
+  }
+  #ofc-trigger-notice .ofc-undo-btn:hover { background: #fde68a; }
 
   /* ── Mode toggle ─────────────────────────────────────────── */
   #ofc-modes {
