@@ -84,6 +84,17 @@ async function handleMessage(
     return { success: true, suggestions: [], writingStyle: style.slice(0, CREATOR_STYLE_MAX_CHARS) };
   }
 
+  if (request.type === 'TRANSLATE_SUGGESTION') {
+    const { suggestionText, fanMessage } = request;
+    const apiKey = await getApiKey();
+    const system = `Translate the creator's chat reply to match the fan's language. Keep it casual, warm, and natural — never formal. Return ONLY valid JSON: {"translatedText":"...","detectedLanguage":"English name of the language, e.g. Spanish"}`;
+    const user = `Fan's message (for language detection): "${fanMessage}"\nCreator reply to translate: "${suggestionText}"`;
+    const raw = await callAnthropicApi({ apiKey, system, user, model: MODEL_HAIKU });
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(cleaned) as { translatedText: string; detectedLanguage: string };
+    return { success: true, suggestions: [], translatedText: parsed.translatedText, detectedLanguage: parsed.detectedLanguage };
+  }
+
   // Dead code path — future request types handled here via discriminated union
   return { success: false, error: 'Unknown request type' };
 }

@@ -382,6 +382,56 @@ export const STYLES = `
     border-color: rgba(16, 185, 129, 0.22);
   }
 
+  /* ── Translate button ───────────────────────────── */
+  .ofc-translate-btn {
+    font-size: 12px;
+    font-weight: 500;
+    color: #94a3b8;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, background 0.15s, border-color 0.15s;
+    pointer-events: none;
+    white-space: nowrap;
+    font-family: inherit;
+    line-height: 1.6;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .ofc-card:hover .ofc-translate-btn {
+    opacity: 1;
+    pointer-events: auto;
+    color: #475569;
+    border-color: #e2e8f0;
+    background: #f1f5f9;
+  }
+  .ofc-translate-btn:hover {
+    color: #0284c7;
+    background: rgba(2, 132, 199, 0.08);
+    border-color: rgba(2, 132, 199, 0.2);
+  }
+  .ofc-translate-btn[data-translate-state="translated"] {
+    opacity: 1;
+    pointer-events: auto;
+    color: #0284c7;
+    background: rgba(2, 132, 199, 0.08);
+    border-color: rgba(2, 132, 199, 0.2);
+  }
+  .ofc-translate-spinner {
+    width: 9px;
+    height: 9px;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: ofc-spin 0.6s linear infinite;
+    display: inline-block;
+  }
+
   /* ── Keyboard shortcut hints ─────────────────────── */
   .ofc-kbd {
     font-size: 11px;

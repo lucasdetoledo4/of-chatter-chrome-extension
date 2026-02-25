@@ -6,6 +6,7 @@ import {
   ICON_REGEN,
   ICON_CHEVRON_UP,
   ICON_CHEVRON_DOWN,
+  ICON_GLOBE,
 } from './overlay-config';
 import { STYLES } from './overlay-styles';
 import {
@@ -103,6 +104,7 @@ export class UIOverlay {
   private _dragOffsetY = 0;
   private _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
   private _dragUpHandler: ((e: MouseEvent) => void) | null = null;
+  private _lastFanMessage = '';
   private _isResizing = false;
   private _resizeDir: 'left' | 'right' | 'top' | 'bottom' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' = 'right';
   private _resizeStartX = 0;
@@ -132,6 +134,10 @@ export class UIOverlay {
 
   setCreatorSwitchHandler(fn: (id: string) => void): void {
     this.creatorSwitchHandler = fn;
+  }
+
+  setLastFanMessage(text: string): void {
+    this._lastFanMessage = text;
   }
 
   setCreators(creators: CreatorAccount[], activeId: string): void {
@@ -532,6 +538,12 @@ export class UIOverlay {
     container.addEventListener('click', (e) => {
       const card = (e.target as Element).closest<HTMLElement>('.ofc-card');
       if (!card) return;
+      // Translate button — handle separately, don't insert
+      if ((e.target as Element).closest('.ofc-translate-btn')) {
+        e.stopPropagation();
+        void this._handleTranslate(card);
+        return;
+      }
       // Stop propagation on use-btn clicks to avoid triggering parent listeners
       if ((e.target as Element).closest('.ofc-use-btn')) e.stopPropagation();
       this.doInsert(card);
@@ -568,7 +580,7 @@ export class UIOverlay {
       .map((s, i) => {
         const cfg = modeTiers?.[i] ?? TYPE_CONFIG[s.type] ?? TYPE_CONFIG.engage;
         return `
-          <div class="ofc-card" data-text="${escapeHtml(s.text)}">
+          <div class="ofc-card" data-text="${escapeHtml(s.text)}" data-original-text="${escapeHtml(s.text)}">
             <div class="ofc-accent-bar" style="background:${cfg.accent};"></div>
             <div class="ofc-card-body">
               <div class="ofc-card-top">
@@ -577,6 +589,7 @@ export class UIOverlay {
                 </span>
                 <div style="display:flex;align-items:center;gap:5px;">
                   <span class="ofc-kbd" title="Alt+${i + 1}">alt ${i + 1}</span>
+                  <button class="ofc-translate-btn" data-translate-state="idle">${ICON_GLOBE} Translate</button>
                   <button class="ofc-use-btn">Use →</button>
                 </div>
               </div>
@@ -722,6 +735,70 @@ export class UIOverlay {
     const body = this.panel?.querySelector<HTMLElement>('#ofc-body');
     if (!body) return;
     body.innerHTML = html;
+  }
+
+  // ─── Translation ──────────────────────────────────────
+
+  private async _handleTranslate(card: HTMLElement): Promise<void> {
+    const btn = card.querySelector<HTMLButtonElement>('.ofc-translate-btn');
+    if (!btn) return;
+
+    const state = btn.dataset['translateState'] ?? 'idle';
+
+    // Revert to original English
+    if (state === 'translated') {
+      const original = card.dataset['originalText'] ?? '';
+      card.dataset['text'] = original;
+      const textEl = card.querySelector<HTMLElement>('.ofc-text');
+      if (textEl) textEl.textContent = original;
+      btn.innerHTML = `${ICON_GLOBE} Translate`;
+      btn.dataset['translateState'] = 'idle';
+      return;
+    }
+
+    // Use cached translation if available
+    const cached = card.dataset['translatedText'];
+    const cachedLang = card.dataset['lang'];
+    if (cached && cachedLang) {
+      card.dataset['text'] = cached;
+      const textEl = card.querySelector<HTMLElement>('.ofc-text');
+      if (textEl) textEl.textContent = cached;
+      btn.innerHTML = `↩ ${cachedLang}`;
+      btn.dataset['translateState'] = 'translated';
+      return;
+    }
+
+    const originalText = card.dataset['originalText'] ?? card.dataset['text'] ?? '';
+    if (!originalText || !this._lastFanMessage) return;
+
+    // Show loading
+    btn.innerHTML = `<span class="ofc-translate-spinner"></span>`;
+    btn.dataset['translateState'] = 'loading';
+    btn.disabled = true;
+
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: 'TRANSLATE_SUGGESTION',
+        suggestionText: originalText,
+        fanMessage: this._lastFanMessage,
+      }) as { success: boolean; translatedText?: string; detectedLanguage?: string; error?: string };
+
+      if (!resp.success || !resp.translatedText) throw new Error(resp.error ?? 'Translation failed');
+
+      const lang = resp.detectedLanguage ?? 'Unknown';
+      card.dataset['translatedText'] = resp.translatedText;
+      card.dataset['lang'] = lang;
+      card.dataset['text'] = resp.translatedText;
+      const textEl = card.querySelector<HTMLElement>('.ofc-text');
+      if (textEl) textEl.textContent = resp.translatedText;
+      btn.innerHTML = `↩ ${lang}`;
+      btn.dataset['translateState'] = 'translated';
+    } catch {
+      btn.innerHTML = `${ICON_GLOBE} Translate`;
+      btn.dataset['translateState'] = 'idle';
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   // ─── Drag to reposition ───────────────────────────────────

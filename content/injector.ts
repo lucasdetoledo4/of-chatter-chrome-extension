@@ -181,6 +181,9 @@ async function handleNewMessage(
     }
   }
 
+  // Store fan message so the overlay can send it with translation requests
+  overlay.setLastFanMessage(msg.text);
+
   // Show fan context strip immediately — persists through loading/suggestions/error
   overlay.showFanContext(fanProfile);
 
