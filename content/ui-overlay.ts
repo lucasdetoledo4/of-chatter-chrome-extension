@@ -652,9 +652,29 @@ export class UIOverlay {
     this.doInsert(card);
   }
 
+  private _savedPanelHeight = '';
+  private _savedPanelMaxHeight = '';
+
   private toggleCollapse(): void {
     this.collapsed = !this.collapsed;
     this.panel?.classList.toggle('collapsed', this.collapsed);
+
+    if (this.panel) {
+      if (this.collapsed) {
+        // Save and clear explicit height so the panel shrinks to just the header
+        this._savedPanelHeight = this.panel.style.height;
+        this._savedPanelMaxHeight = this.panel.style.maxHeight;
+        this.panel.style.height = '';
+        this.panel.style.maxHeight = '';
+      } else {
+        // Restore explicit height if one was set before collapsing
+        if (this._savedPanelHeight) {
+          this.panel.style.height = this._savedPanelHeight;
+          this.panel.style.maxHeight = this._savedPanelMaxHeight;
+        }
+      }
+    }
+
     const collapseBtn = this.shadow?.querySelector('#ofc-collapse');
     if (collapseBtn) {
       collapseBtn.innerHTML = this.collapsed ? ICON_CHEVRON_DOWN : ICON_CHEVRON_UP;
