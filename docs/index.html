@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatter Ghost — Privacy Policy</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 60px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
+    h1 { font-size: 28px; margin-bottom: 4px; }
+    h2 { font-size: 18px; margin-top: 36px; color: #334155; }
+    p, li { font-size: 15px; color: #475569; }
+    ul { padding-left: 20px; }
+    .meta { font-size: 13px; color: #94a3b8; margin-bottom: 40px; }
+    a { color: #7c3aed; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="meta">Chatter Ghost Chrome Extension — Last updated: February 2026</p>
+
+  <h2>What data we collect</h2>
+  <p>Chatter Ghost stores the following data <strong>locally in your browser</strong> using Chrome's built-in storage API:</p>
+  <ul>
+    <li><strong>Anthropic API key</strong> — entered by you, stored in <code>chrome.storage.sync</code>, never transmitted to any server other than Anthropic's API</li>
+    <li><strong>Fan profiles</strong> — display names, message counts, spend estimates, and notes scraped from the active chat page, stored in <code>chrome.storage.local</code></li>
+    <li><strong>Creator profiles</strong> — display name and writing style summary, stored in <code>chrome.storage.local</code></li>
+    <li><strong>Panel preferences</strong> — position, size, and mode settings, stored in <code>chrome.storage.local</code></li>
+  </ul>
+
+  <h2>What data leaves your browser</h2>
+  <p>The only external service Chatter Ghost communicates with is the <strong>Anthropic API</strong> (<code>api.anthropic.com</code>). The following data is sent per request:</p>
+  <ul>
+    <li>Recent conversation messages (last 20) from the active chat</li>
+    <li>Fan profile summary (spend tier, subscription duration, tags)</li>
+    <li>Creator persona settings</li>
+  </ul>
+  <p>No data is sent to any server operated by the developers of Chatter Ghost.</p>
+
+  <h2>What data we do NOT collect</h2>
+  <ul>
+    <li>We do not collect analytics or usage data</li>
+    <li>We do not operate any backend server</li>
+    <li>We do not have access to your API key after it is saved to your browser</li>
+    <li>We do not store or transmit payment information</li>
+  </ul>
+
+  <h2>Data retention</h2>
+  <p>All data is stored locally in your browser. You can clear it at any time by removing the extension or clearing extension storage via <code>chrome://extensions</code>.</p>
+
+  <h2>Third-party services</h2>
+  <p>This extension uses the <strong>Anthropic Claude API</strong>. Please review Anthropic's privacy policy at <a href="https://anthropic.com/privacy">anthropic.com/privacy</a>.</p>
+</body>
+</html>
