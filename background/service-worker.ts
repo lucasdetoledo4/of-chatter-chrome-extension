@@ -156,23 +156,39 @@ async function callAnthropicApi(params: CallApiParams): Promise<string> {
     headers['anthropic-beta'] = ANTHROPIC_BETA_CACHE;
   }
 
+  // 30-second hard timeout covers all retry attempts combined.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
   const fetchOnce = () =>
     fetch(ANTHROPIC_API_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
 
-  let response = await fetchOnce();
-
-  // Retry with exponential backoff on 529 (overloaded) and 5xx transient errors.
-  // 4xx errors (bad key, invalid request) are not retried — they won't recover.
-  for (const delay of API_RETRY_DELAYS) {
-    if (response.ok) break;
-    if (response.status !== 529 && response.status < 500) break;
-    await new Promise((r) => setTimeout(r, delay));
+  let response: Response;
+  try {
     response = await fetchOnce();
+
+    // Retry with exponential backoff on 529 (overloaded) and 5xx transient errors.
+    // 4xx errors (bad key, invalid request) are not retried — they won't recover.
+    for (const delay of API_RETRY_DELAYS) {
+      if (response.ok) break;
+      if (response.status !== 529 && response.status < 500) break;
+      await new Promise((r) => setTimeout(r, delay));
+      response = await fetchOnce();
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Request timed out — please try again');
+    }
+    throw err;
   }
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorText = await response.text();
