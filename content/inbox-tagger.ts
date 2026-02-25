@@ -26,32 +26,11 @@ const PILL_BASE = [
 
 // ─── DOM helpers ──────────────────────────────────────────────────────────────
 
-const CHAT_LINK_RE = /\/my\/chats\/chat\/([^/?#]+)|\/messages\/([^/?#]+)/;
-
-/**
- * Find the chat inbox list container to scope tag injection.
- *
- * OF renders the inbox list, pinned section, and gallery in different
- * containers. We want tags ONLY on the regular inbox conversation rows —
- * the "left chat boxes" the chatter uses to pick who to reply to.
- *
- * Selectors in priority order (validated 2026-02 where possible):
- *  1. at-attr="chats_list" — OF's stable AT attribute for the inbox list
- *  2. .b-chats__list — BEM class used in some OF builds
- *  3. [class*="chats__list"] — flexible match for minified variants
- *
- * Falls back to null; callers fall back to document-wide scan (existing
- * behaviour) if the container is not found.
- */
-function findChatListScope(): Element | null {
-  return (
-    document.querySelector('[at-attr="chats_list"]') ??
-    document.querySelector('[at-attr="list_chats"]') ??
-    document.querySelector('.b-chats__list') ??
-    document.querySelector('[class*="b-chats__list"]') ??
-    null
-  );
-}
+// Only match direct chat links — fanId must be the last path segment.
+// Allows optional trailing slash (/chat/123 or /chat/123/) but rejects
+// sub-path links like /chat/123/pinned or /chat/123/gallery which are
+// toolbar navigation buttons in the open chat view, not inbox rows.
+const CHAT_LINK_RE = /\/my\/chats\/chat\/([^/?#]+)\/?(?=[?#]|$)|\/messages\/([^/?#]+)\/?(?=[?#]|$)/;
 
 function extractFanId(href: string): string | null {
   const match = href.match(CHAT_LINK_RE);
@@ -93,10 +72,7 @@ async function tagLink(link: HTMLAnchorElement): Promise<void> {
 // ─── Scanner ──────────────────────────────────────────────────────────────────
 
 function scanAndTag(): void {
-  // Scope to the inbox list container when found — avoids tagging links in the
-  // pinned section, gallery, vault, and other non-inbox contexts.
-  const scope: Element | Document = findChatListScope() ?? document;
-  const links = Array.from(scope.querySelectorAll<HTMLAnchorElement>(
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="/my/chats/chat/"], a[href*="/messages/"]'
   ));
   for (const link of links) {
