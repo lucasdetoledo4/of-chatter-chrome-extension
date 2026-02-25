@@ -21,6 +21,9 @@ SKILLS.md
 tasks/
 SUGGESTIONS.md
 
+# Extension package
+*.zip
+
 # OS
 .DS_Store
 Thumbs.db
