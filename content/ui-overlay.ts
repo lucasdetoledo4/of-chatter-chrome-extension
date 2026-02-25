@@ -491,10 +491,20 @@ export class UIOverlay {
   }
 
   /** Show a brief banner explaining an auto-mode-switch triggered by a fan keyword. */
-  showTriggerNotice(reason: string): void {
+  showTriggerNotice(reason: string, onUndo?: () => void): void {
     const el = this.shadow?.querySelector<HTMLElement>('#ofc-trigger-notice');
     if (!el) return;
-    el.textContent = `⚡ Switched to Sell · ${reason}`;
+    el.innerHTML = `
+      <span class="ofc-notice-text">⚡ Switched to Sell · ${escapeHtml(reason)}</span>
+      ${onUndo ? '<button class="ofc-undo-btn">Undo</button>' : ''}
+    `;
+    if (onUndo) {
+      const btn = el.querySelector<HTMLButtonElement>('.ofc-undo-btn');
+      btn?.addEventListener('click', () => {
+        onUndo();
+        el.classList.remove('visible');
+      });
+    }
     el.classList.add('visible');
     setTimeout(() => el.classList.remove('visible'), TRIGGER_NOTICE_MS);
   }
@@ -503,7 +513,7 @@ export class UIOverlay {
   showClipboardNotice(): void {
     const el = this.shadow?.querySelector<HTMLElement>('#ofc-trigger-notice');
     if (!el) return;
-    el.textContent = 'Copied to clipboard — paste into chat (Ctrl+V)';
+    el.innerHTML = `<span class="ofc-notice-text">Copied to clipboard — paste into chat (Ctrl+V)</span>`;
     el.classList.add('visible');
     setTimeout(() => el.classList.remove('visible'), 3_000);
   }
