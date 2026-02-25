@@ -83,3 +83,5 @@ export const LEGACY_PLACEHOLDER_RE = /^(Creator \d+|New Creator)$/;
 
 export const PANEL_HOST_ID       = 'ofc-suggestion-host';
 export const PANEL_POSITION_KEY  = 'ofc_panel_pos';
+export const PANEL_MIN_WIDTH     = 320;
+export const PANEL_MAX_WIDTH     = 720;

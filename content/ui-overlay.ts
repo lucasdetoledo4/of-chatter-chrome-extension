@@ -11,6 +11,8 @@ import { STYLES } from './overlay-styles';
 import {
   PANEL_HOST_ID,
   PANEL_POSITION_KEY,
+  PANEL_MIN_WIDTH,
+  PANEL_MAX_WIDTH,
   REGEN_FEEDBACK_MS,
   REGEN_COOLDOWN_MS,
   NOTES_SAVED_MS,
@@ -101,6 +103,13 @@ export class UIOverlay {
   private _dragOffsetY = 0;
   private _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
   private _dragUpHandler: ((e: MouseEvent) => void) | null = null;
+  private _isResizing = false;
+  private _resizeDir: 'left' | 'right' = 'right';
+  private _resizeStartX = 0;
+  private _resizeStartW = 0;
+  private _resizeStartLeft = 0;
+  private _resizeMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private _resizeUpHandler: ((e: MouseEvent) => void) | null = null;
 
   setInsertHandler(fn: (text: string) => void): void {
     this.insertHandler = fn;
@@ -220,6 +229,14 @@ export class UIOverlay {
     panel.appendChild(notesSection);
     shadow.appendChild(panel);
 
+    // Resize handles — siblings of panel, positioned absolute relative to :host
+    const resizeLeft = document.createElement('div');
+    resizeLeft.className = 'ofc-resize-handle ofc-resize-handle-left';
+    const resizeRight = document.createElement('div');
+    resizeRight.className = 'ofc-resize-handle ofc-resize-handle-right';
+    shadow.appendChild(resizeLeft);
+    shadow.appendChild(resizeRight);
+
     this.host = host;
     this.shadow = shadow;
     this.panel = panel;
@@ -315,6 +332,10 @@ export class UIOverlay {
       if ((e.target as Element).closest('button')) return;
       this._startDrag(e);
     });
+
+    // Wire resize handles
+    resizeLeft.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'left'); });
+    resizeRight.addEventListener('mousedown', (e) => { e.preventDefault(); this._startResize(e, 'right'); });
 
     // Restore last saved position (async — panel shows at default first, then snaps)
     this._loadSavedPosition();
@@ -462,7 +483,15 @@ export class UIOverlay {
       document.removeEventListener('mouseup', this._dragUpHandler);
       this._dragUpHandler = null;
     }
-    document.body.style.userSelect = ''; // in case removed mid-drag
+    if (this._resizeMoveHandler) {
+      document.removeEventListener('mousemove', this._resizeMoveHandler);
+      this._resizeMoveHandler = null;
+    }
+    if (this._resizeUpHandler) {
+      document.removeEventListener('mouseup', this._resizeUpHandler);
+      this._resizeUpHandler = null;
+    }
+    document.body.style.userSelect = ''; // in case removed mid-drag or mid-resize
     this.host?.remove();
     this.host = null;
     this.shadow = null;
@@ -692,20 +721,72 @@ export class UIOverlay {
     this._dragUpHandler = null;
     const x = parseFloat(this.host.style.left) || 0;
     const y = parseFloat(this.host.style.top) || 0;
-    void chrome.storage.local.set({ [PANEL_POSITION_KEY]: { x, y } });
+    const w = this.host.offsetWidth;
+    void chrome.storage.local.set({ [PANEL_POSITION_KEY]: { x, y, w } });
   }
 
   private _loadSavedPosition(): void {
     if (!this.host) return;
     void chrome.storage.local.get(PANEL_POSITION_KEY).then((result) => {
-      const pos = result[PANEL_POSITION_KEY] as { x: number; y: number } | undefined;
+      const pos = result[PANEL_POSITION_KEY] as { x: number; y: number; w?: number } | undefined;
       if (!pos || !this.host) return;
-      const panelW = 460; // matches :host width in CSS
-      const x = Math.max(0, Math.min(pos.x, window.innerWidth - panelW));
+      const w = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, pos.w ?? 460));
+      const x = Math.max(0, Math.min(pos.x, window.innerWidth - w));
       const y = Math.max(0, Math.min(pos.y, window.innerHeight - 40));
       this.host.style.right = '';
       this.host.style.left = `${x}px`;
       this.host.style.top = `${y}px`;
+      this.host.style.width = `${w}px`;
     });
+  }
+
+  // ─── Resize by edge dragging ───────────────────────────
+
+  private _startResize(e: MouseEvent, dir: 'left' | 'right'): void {
+    if (!this.host) return;
+    const rect = this.host.getBoundingClientRect();
+    // Convert to left-anchored so width adjustments work in both directions
+    this.host.style.right = '';
+    this.host.style.left = `${rect.left}px`;
+    this._isResizing = true;
+    this._resizeDir = dir;
+    this._resizeStartX = e.clientX;
+    this._resizeStartW = rect.width;
+    this._resizeStartLeft = rect.left;
+    document.body.style.userSelect = 'none';
+    this._resizeMoveHandler = (ev: MouseEvent) => this._onResizeMove(ev);
+    this._resizeUpHandler = () => this._onResizeUp();
+    document.addEventListener('mousemove', this._resizeMoveHandler);
+    document.addEventListener('mouseup', this._resizeUpHandler);
+  }
+
+  private _onResizeMove(e: MouseEvent): void {
+    if (!this._isResizing || !this.host) return;
+    const delta = e.clientX - this._resizeStartX;
+    if (this._resizeDir === 'right') {
+      const newW = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, this._resizeStartW + delta));
+      this.host.style.width = `${newW}px`;
+    } else {
+      // Left edge drag: keep right edge fixed, move left edge
+      const newW = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, this._resizeStartW - delta));
+      const rightEdge = this._resizeStartLeft + this._resizeStartW;
+      const newLeft = Math.max(0, rightEdge - newW);
+      this.host.style.width = `${newW}px`;
+      this.host.style.left = `${newLeft}px`;
+    }
+  }
+
+  private _onResizeUp(): void {
+    if (!this._isResizing || !this.host) return;
+    this._isResizing = false;
+    document.body.style.userSelect = '';
+    if (this._resizeMoveHandler) document.removeEventListener('mousemove', this._resizeMoveHandler);
+    if (this._resizeUpHandler) document.removeEventListener('mouseup', this._resizeUpHandler);
+    this._resizeMoveHandler = null;
+    this._resizeUpHandler = null;
+    const x = parseFloat(this.host.style.left) || 0;
+    const y = parseFloat(this.host.style.top) || 0;
+    const w = this.host.offsetWidth;
+    void chrome.storage.local.set({ [PANEL_POSITION_KEY]: { x, y, w } });
   }
 }

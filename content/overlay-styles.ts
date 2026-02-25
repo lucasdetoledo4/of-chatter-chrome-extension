@@ -543,4 +543,16 @@ export const STYLES = `
   }
 
   .ofc-notes-saved.visible { opacity: 1; }
+
+  /* ── Resize handles ──────────────────────────────────── */
+  .ofc-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+    z-index: 2;
+  }
+  .ofc-resize-handle-left  { left: -4px; }
+  .ofc-resize-handle-right { right: -4px; }
 `;
