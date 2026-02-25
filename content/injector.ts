@@ -140,7 +140,20 @@ async function handleNewMessage(
   onRequest: (req: GetSuggestionsRequest) => void
 ): Promise<void> {
   overlay.showLoading();
+  try {
+    await _handleNewMessageInner(msg, fanId, overlay, onRequest);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Unexpected error — please reload the page.';
+    overlay.showError(errMsg);
+  }
+}
 
+async function _handleNewMessageInner(
+  msg: ConversationMessage,
+  fanId: string,
+  overlay: UIOverlay,
+  onRequest: (req: GetSuggestionsRequest) => void
+): Promise<void> {
   // Get or create fan profile
   let fanProfile = await getFanProfile(fanId);
   if (!fanProfile) {
