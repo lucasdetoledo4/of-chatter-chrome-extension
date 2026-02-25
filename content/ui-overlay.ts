@@ -772,7 +772,7 @@ export class UIOverlay {
       card.dataset['text'] = cached;
       const textEl = card.querySelector<HTMLElement>('.ofc-text');
       if (textEl) textEl.textContent = cached;
-      btn.innerHTML = `↩ ${cachedLang}`;
+      btn.innerHTML = `↩ ${escapeHtml(cachedLang)}`;
       btn.dataset['translateState'] = 'translated';
       return;
     }
@@ -800,7 +800,7 @@ export class UIOverlay {
       card.dataset['text'] = resp.translatedText;
       const textEl = card.querySelector<HTMLElement>('.ofc-text');
       if (textEl) textEl.textContent = resp.translatedText;
-      btn.innerHTML = `↩ ${lang}`;
+      btn.innerHTML = `↩ ${escapeHtml(lang)}`;
       btn.dataset['translateState'] = 'translated';
     } catch {
       btn.innerHTML = `${ICON_GLOBE} Translate`;
