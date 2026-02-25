@@ -100,11 +100,17 @@ export interface AnalyzeCreatorStyleRequest {
   creatorMessages: string[];
 }
 
+export interface TranslateSuggestionRequest {
+  type: 'TRANSLATE_SUGGESTION';
+  suggestionText: string;
+  fanMessage: string;
+}
+
 // Discriminated union — add more message types here as the extension grows
-export type BackgroundRequest = GetSuggestionsRequest | AnalyzeCreatorStyleRequest;
+export type BackgroundRequest = GetSuggestionsRequest | AnalyzeCreatorStyleRequest | TranslateSuggestionRequest;
 
 export type BackgroundResponse =
-  | { success: true; suggestions: Suggestion[]; writingStyle?: string }
+  | { success: true; suggestions: Suggestion[]; writingStyle?: string; translatedText?: string; detectedLanguage?: string }
   | { success: false; error: string };
 
 // ─── Anthropic API ────────────────────────────────────────────────────────────
