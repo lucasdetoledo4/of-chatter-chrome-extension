@@ -28,11 +28,11 @@ export function findChatInput(): HTMLElement | null {
  *
  * Falls back to clipboard if no input is found.
  */
-export function insertIntoChat(text: string): void {
+export function insertIntoChat(text: string): 'inserted' | 'clipboard' {
   const input = findChatInput();
   if (!input) {
     void navigator.clipboard.writeText(text);
-    return;
+    return 'clipboard';
   }
 
   input.focus();
@@ -48,6 +48,8 @@ export function insertIntoChat(text: string): void {
     document.execCommand('selectAll');
     document.execCommand('insertText', false, text);
   }
+
+  return 'inserted';
 }
 
 /**
