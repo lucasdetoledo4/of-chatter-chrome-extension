@@ -5,7 +5,8 @@
   "scripts": {
     "build": "bun build.js",
     "build:watch": "bun build.js --watch",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "pack": "bun build.js && zip -r chatter-ghost.zip manifest.json dist/ popup/popup.html popup/popup.js icons/ -x '*.map'"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
